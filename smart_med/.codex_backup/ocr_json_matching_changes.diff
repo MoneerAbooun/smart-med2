@@ -1,0 +1,895 @@
+diff --git ".codex_backup\\empty.txt" "lib\\data\\medicine\\medicine_name_entry.dart"
+index e69de29..12a1958 100644
+--- ".codex_backup\\empty.txt"
++++ "lib\\data\\medicine\\medicine_name_entry.dart"
+@@ -0,0 +1,38 @@
++String? _textOrNull(dynamic value) {
++  final text = value?.toString().trim();
++  if (text == null || text.isEmpty) {
++    return null;
++  }
++
++  return text;
++}
++
++class MedicineNameEntry {
++  const MedicineNameEntry({
++    this.id,
++    required this.brandName,
++    required this.genericName,
++  });
++
++  final String? id;
++  final String brandName;
++  final String genericName;
++
++  factory MedicineNameEntry.fromMap(Map<String, dynamic> map) {
++    final brandName = _textOrNull(map['brandName'] ?? map['brand_name']) ?? '';
++    final genericName =
++        _textOrNull(map['genericName'] ?? map['generic_name']) ?? '';
++
++    if (brandName.isEmpty && genericName.isEmpty) {
++      throw const FormatException(
++        'Medicine entry must include a brand name or generic name.',
++      );
++    }
++
++    return MedicineNameEntry(
++      id: _textOrNull(map['id']),
++      brandName: brandName,
++      genericName: genericName,
++    );
++  }
++}
+
+diff --git ".codex_backup\\empty.txt" "lib\\data\\medicine\\medicine_name_repository.dart"
+index e69de29..a240b17 100644
+--- ".codex_backup\\empty.txt"
++++ "lib\\data\\medicine\\medicine_name_repository.dart"
+@@ -0,0 +1,106 @@
++import 'dart:convert';
++
++import 'package:flutter/services.dart';
++import 'package:smart_med/data/medicine/medicine_name_entry.dart';
++
++class MedicineNameRepositoryException implements Exception {
++  const MedicineNameRepositoryException(this.message);
++
++  final String message;
++
++  @override
++  String toString() => message;
++}
++
++class MedicineNameRepository {
++  MedicineNameRepository({
++    AssetBundle? bundle,
++    String assetPath = _defaultAssetPath,
++  }) : _bundle = bundle ?? rootBundle,
++       _assetPath = assetPath;
++
++  static const String _defaultAssetPath = 'assets/data/local_medicines.json';
++
++  final AssetBundle _bundle;
++  final String _assetPath;
++
++  List<MedicineNameEntry>? _cachedEntries;
++  Future<List<MedicineNameEntry>>? _pendingLoad;
++
++  Future<List<MedicineNameEntry>> loadEntries() async {
++    final cachedEntries = _cachedEntries;
++    if (cachedEntries != null) {
++      return cachedEntries;
++    }
++
++    final pendingLoad = _pendingLoad;
++    if (pendingLoad != null) {
++      return pendingLoad;
++    }
++
++    final loadFuture = _loadEntries();
++    _pendingLoad = loadFuture;
++    return loadFuture;
++  }
++
++  Future<List<MedicineNameEntry>> _loadEntries() async {
++    try {
++      final rawJson = await _bundle.loadString(_assetPath);
++      final decoded = jsonDecode(rawJson);
++      final entries = List<MedicineNameEntry>.unmodifiable(
++        _parseEntries(decoded),
++      );
++      _cachedEntries = entries;
++      return entries;
++    } on MedicineNameRepositoryException {
++      rethrow;
++    } on Object {
++      throw const MedicineNameRepositoryException(
++        'The local medicine name list could not be loaded.',
++      );
++    } finally {
++      _pendingLoad = null;
++    }
++  }
++
++  List<MedicineNameEntry> _parseEntries(dynamic decoded) {
++    if (decoded is List) {
++      return _parseEntryList(decoded);
++    }
++
++    if (decoded is Map<String, dynamic>) {
++      final nestedItems =
++          decoded['medicines'] ??
++          decoded['data'] ??
++          decoded['items'] ??
++          decoded['results'];
++      if (nestedItems is List) {
++        return _parseEntryList(nestedItems);
++      }
++    }
++
++    throw const MedicineNameRepositoryException(
++      'The local medicine name list has an unsupported JSON structure.',
++    );
++  }
++
++  List<MedicineNameEntry> _parseEntryList(List<dynamic> items) {
++    final entries = <MedicineNameEntry>[];
++
++    for (final item in items.whereType<Map>()) {
++      try {
++        final normalizedItem = <String, dynamic>{};
++        item.forEach((key, value) {
++          normalizedItem[key.toString()] = value;
++        });
++        entries.add(MedicineNameEntry.fromMap(normalizedItem));
++      } on Object {
++        continue;
++      }
++    }
++
++    return entries;
++  }
++}
++
++final MedicineNameRepository medicineNameRepository = MedicineNameRepository();
+
+diff --git ".codex_backup\\empty.txt" "lib\\data\\medicine\\medicine_name_matcher.dart"
+index e69de29..637baea 100644
+--- ".codex_backup\\empty.txt"
++++ "lib\\data\\medicine\\medicine_name_matcher.dart"
+@@ -0,0 +1,336 @@
++import 'package:smart_med/data/medicine/medicine_name_entry.dart';
++
++enum MedicineNameMatchKind {
++  brandExact,
++  genericExact,
++  brandContains,
++  genericContains,
++}
++
++class MedicineNameMatch {
++  const MedicineNameMatch({
++    required this.entry,
++    required this.kind,
++    required this.cleanedText,
++    required this.cleanedCandidates,
++  });
++
++  final MedicineNameEntry entry;
++  final MedicineNameMatchKind kind;
++  final String cleanedText;
++  final List<String> cleanedCandidates;
++
++  bool get matchedOnBrand =>
++      kind == MedicineNameMatchKind.brandExact ||
++      kind == MedicineNameMatchKind.brandContains;
++
++  String? get matchedBrandName =>
++      entry.brandName.trim().isEmpty ? null : entry.brandName;
++
++  String? get matchedGenericName =>
++      entry.genericName.trim().isEmpty ? null : entry.genericName;
++
++  String get preferredQuery {
++    if (matchedOnBrand && matchedBrandName != null) {
++      return matchedBrandName!;
++    }
++
++    if (matchedGenericName != null) {
++      return matchedGenericName!;
++    }
++
++    return matchedBrandName ?? '';
++  }
++
++  List<String> get backendQueries {
++    final queries = <String>[];
++    final seen = <String>{};
++
++    void addQuery(String? value) {
++      final query = value?.trim();
++      if (query == null || query.isEmpty) {
++        return;
++      }
++
++      final key = query.toLowerCase();
++      if (seen.add(key)) {
++        queries.add(query);
++      }
++    }
++
++    addQuery(preferredQuery);
++
++    if (matchedOnBrand) {
++      addQuery(matchedGenericName);
++    } else {
++      addQuery(matchedBrandName);
++    }
++
++    return List<String>.unmodifiable(queries);
++  }
++}
++
++class MedicineNameMatcher {
++  const MedicineNameMatcher();
++
++  static const Set<String> _packageWords = <String>{
++    'capsule',
++    'capsules',
++    'drug',
++    'easy',
++    'effective',
++    'medicine',
++    'oral',
++    'pain',
++    'relief',
++    'swallow',
++    'syrup',
++    'tablet',
++    'tablets',
++  };
++
++  String normalizeText(String value) {
++    final trimmed = value.trim().toLowerCase();
++    if (trimmed.isEmpty) {
++      return '';
++    }
++
++    final withoutDosage = trimmed.replaceAll(
++      RegExp(
++        r'\b\d+(?:[.,]\d+)?(?:\s|-)?(?:mg|mcg|g|kg|ml|iu|%)\b',
++        caseSensitive: false,
++      ),
++      ' ',
++    );
++    final withoutPunctuation = withoutDosage.replaceAll(
++      RegExp(r'[^a-z0-9\s]'),
++      ' ',
++    );
++    final rawTokens = withoutPunctuation
++        .split(RegExp(r'\s+'))
++        .map((token) => token.trim())
++        .where((token) => token.isNotEmpty);
++    final filteredTokens = rawTokens.where((token) {
++      if (RegExp(r'^\d+(?:[.,]\d+)?$').hasMatch(token)) {
++        return false;
++      }
++
++      return !_packageWords.contains(token);
++    });
++
++    return filteredTokens.join(' ').trim();
++  }
++
++  List<String> normalizeCandidates(Iterable<String> values) {
++    final candidates = <String>[];
++    final seen = <String>{};
++
++    for (final value in values) {
++      final normalized = normalizeText(value);
++      if (normalized.isEmpty) {
++        continue;
++      }
++
++      if (seen.add(normalized)) {
++        candidates.add(normalized);
++      }
++    }
++
++    return List<String>.unmodifiable(candidates);
++  }
++
++  String normalizeCombinedText(Iterable<String> values) {
++    return normalizeText(
++      values
++          .map((value) => value.trim())
++          .where((value) => value.isNotEmpty)
++          .join(' '),
++    );
++  }
++
++  MedicineNameMatch? match({
++    required List<String> ocrCandidates,
++    required List<MedicineNameEntry> entries,
++  }) {
++    final cleanedCandidates = normalizeCandidates(ocrCandidates);
++    final cleanedText = normalizeCombinedText(ocrCandidates);
++
++    _ScoredMedicineNameMatch? bestMatch;
++
++    for (final entry in entries) {
++      final candidateMatch = _bestMatchForEntry(
++        entry: entry,
++        cleanedCandidates: cleanedCandidates,
++        cleanedText: cleanedText,
++      );
++      if (candidateMatch == null) {
++        continue;
++      }
++
++      if (bestMatch == null || candidateMatch.score > bestMatch.score) {
++        bestMatch = candidateMatch;
++      }
++    }
++
++    return bestMatch?.toMatch(
++      cleanedText: cleanedText,
++      cleanedCandidates: cleanedCandidates,
++    );
++  }
++
++  _ScoredMedicineNameMatch? _bestMatchForEntry({
++    required MedicineNameEntry entry,
++    required List<String> cleanedCandidates,
++    required String cleanedText,
++  }) {
++    _ScoredMedicineNameMatch? bestMatch;
++
++    void consider(_ScoredMedicineNameMatch? match) {
++      if (match == null) {
++        return;
++      }
++
++      if (bestMatch == null || match.score > bestMatch!.score) {
++        bestMatch = match;
++      }
++    }
++
++    final normalizedBrandName = normalizeText(entry.brandName);
++    final normalizedGenericName = normalizeText(entry.genericName);
++
++    consider(
++      _evaluateName(
++        entry: entry,
++        normalizedName: normalizedBrandName,
++        kind: MedicineNameMatchKind.brandExact,
++        cleanedCandidates: cleanedCandidates,
++        cleanedText: cleanedText,
++      ),
++    );
++    consider(
++      _evaluateName(
++        entry: entry,
++        normalizedName: normalizedGenericName,
++        kind: MedicineNameMatchKind.genericExact,
++        cleanedCandidates: cleanedCandidates,
++        cleanedText: cleanedText,
++      ),
++    );
++    consider(
++      _evaluateName(
++        entry: entry,
++        normalizedName: normalizedBrandName,
++        kind: MedicineNameMatchKind.brandContains,
++        cleanedCandidates: cleanedCandidates,
++        cleanedText: cleanedText,
++      ),
++    );
++    consider(
++      _evaluateName(
++        entry: entry,
++        normalizedName: normalizedGenericName,
++        kind: MedicineNameMatchKind.genericContains,
++        cleanedCandidates: cleanedCandidates,
++        cleanedText: cleanedText,
++      ),
++    );
++
++    return bestMatch;
++  }
++
++  _ScoredMedicineNameMatch? _evaluateName({
++    required MedicineNameEntry entry,
++    required String normalizedName,
++    required MedicineNameMatchKind kind,
++    required List<String> cleanedCandidates,
++    required String cleanedText,
++  }) {
++    if (normalizedName.isEmpty) {
++      return null;
++    }
++
++    final exactMatch =
++        kind == MedicineNameMatchKind.brandExact ||
++        kind == MedicineNameMatchKind.genericExact;
++
++    final matchesCandidate = cleanedCandidates.any((candidate) {
++      if (exactMatch) {
++        return candidate == normalizedName;
++      }
++
++      return _containsPhrase(candidate, normalizedName);
++    });
++
++    if (matchesCandidate) {
++      return _ScoredMedicineNameMatch(
++        entry: entry,
++        kind: kind,
++        score: _scoreFor(kind, normalizedName.length, fromCombinedText: false),
++      );
++    }
++
++    final matchesCombinedText = exactMatch
++        ? cleanedText == normalizedName
++        : _containsPhrase(cleanedText, normalizedName);
++    if (!matchesCombinedText) {
++      return null;
++    }
++
++    return _ScoredMedicineNameMatch(
++      entry: entry,
++      kind: kind,
++      score: _scoreFor(kind, normalizedName.length, fromCombinedText: true),
++    );
++  }
++
++  bool _containsPhrase(String haystack, String needle) {
++    if (haystack.isEmpty || needle.isEmpty) {
++      return false;
++    }
++
++    return ' $haystack '.contains(' $needle ');
++  }
++
++  int _scoreFor(
++    MedicineNameMatchKind kind,
++    int nameLength, {
++    required bool fromCombinedText,
++  }) {
++    final sourcePenalty = fromCombinedText ? -10 : 0;
++
++    switch (kind) {
++      case MedicineNameMatchKind.brandExact:
++        return 400 + nameLength + sourcePenalty;
++      case MedicineNameMatchKind.genericExact:
++        return 390 + nameLength + sourcePenalty;
++      case MedicineNameMatchKind.brandContains:
++        return 300 + nameLength + sourcePenalty;
++      case MedicineNameMatchKind.genericContains:
++        return 290 + nameLength + sourcePenalty;
++    }
++  }
++}
++
++class _ScoredMedicineNameMatch {
++  const _ScoredMedicineNameMatch({
++    required this.entry,
++    required this.kind,
++    required this.score,
++  });
++
++  final MedicineNameEntry entry;
++  final MedicineNameMatchKind kind;
++  final int score;
++
++  MedicineNameMatch toMatch({
++    required String cleanedText,
++    required List<String> cleanedCandidates,
++  }) {
++    return MedicineNameMatch(
++      entry: entry,
++      kind: kind,
++      cleanedText: cleanedText,
++      cleanedCandidates: cleanedCandidates,
++    );
++  }
++}
+
+diff --git ".codex_backup\\medicine_image_text_recognizer.dart.bak" "lib\\features\\medicine_search\\data\\services\\medicine_image_text_recognizer.dart"
+index 90bb425..b28685b 100644
+--- ".codex_backup\\medicine_image_text_recognizer.dart.bak"
++++ "lib\\features\\medicine_search\\data\\services\\medicine_image_text_recognizer.dart"
+@@ -31,6 +31,8 @@ class MlKitMedicineImageTextRecognizer implements MedicineImageTextRecognizer {
+     'coated',
+     'directions',
+     'drug',
++    'easy',
++    'effective',
+     'extra',
+     'fever',
+     'film',
+@@ -60,6 +62,8 @@ class MlKitMedicineImageTextRecognizer implements MedicineImageTextRecognizer {
+     'store',
+     'strength',
+     'suspension',
++    'swallow',
++    'syrup',
+     'tablet',
+     'tablets',
+     'temperature',
+@@ -90,7 +94,9 @@ class MlKitMedicineImageTextRecognizer implements MedicineImageTextRecognizer {
+     try {
+       final inputImage = InputImage.fromFilePath(imagePath);
+       final recognizedText = await textRecognizer.processImage(inputImage);
++      debugPrint('Medicine image OCR raw text: ${recognizedText.text}');
+       final candidates = _buildCandidates(recognizedText);
++      debugPrint('Medicine image OCR candidates: $candidates');
+ 
+       if (candidates.isEmpty) {
+         throw const MedicineImageTextRecognizerException(
+
+diff --git ".codex_backup\\medicine_lookup_repository.dart.bak" "lib\\features\\medicine_search\\data\\repositories\\medicine_lookup_repository.dart"
+index 075082a..cd691cf 100644
+--- ".codex_backup\\medicine_lookup_repository.dart.bak"
++++ "lib\\features\\medicine_search\\data\\repositories\\medicine_lookup_repository.dart"
+@@ -1,7 +1,11 @@
++import 'package:flutter/foundation.dart';
+ import 'package:image_picker/image_picker.dart';
++import 'package:smart_med/data/medicine/medicine_name_matcher.dart';
+ import 'package:smart_med/core/network/api_client.dart';
+ import 'package:smart_med/features/medicine_search/data/services/medicine_image_text_recognizer.dart';
+ import 'package:smart_med/features/medicine_search/domain/models/medicine_lookup_result.dart';
++import 'package:smart_med/data/medicine/medicine_name_repository.dart'
++    as local_medicine;
+ 
+ class MedicineLookupRepositoryException implements Exception {
+   const MedicineLookupRepositoryException(this.message);
+@@ -16,11 +20,25 @@ class MedicineLookupRepository {
+   MedicineLookupRepository({
+     ApiClient? apiClient,
+     MedicineImageTextRecognizer? imageTextRecognizer,
++    local_medicine.MedicineNameRepository? medicineNameRepository,
++    MedicineNameMatcher? medicineNameMatcher,
+   }) : _apiClient = apiClient ?? ApiClient(),
+-       _imageTextRecognizer = imageTextRecognizer ?? medicineImageTextRecognizer;
++       _imageTextRecognizer =
++           imageTextRecognizer ?? medicineImageTextRecognizer,
++       _medicineNameRepository =
++           medicineNameRepository ?? local_medicine.medicineNameRepository,
++       _medicineNameMatcher =
++           medicineNameMatcher ?? const MedicineNameMatcher();
++
++  static const String _noBackendMatchMessage =
++      'No matching medicine was found. Try a brand name or generic name.';
++  static const String _noLocalMatchMessage =
++      'No matching medicine name was found in the local medicine list for the text in this image. Try a clearer photo with the medicine name visible.';
+ 
+   final ApiClient _apiClient;
+   final MedicineImageTextRecognizer _imageTextRecognizer;
++  final local_medicine.MedicineNameRepository _medicineNameRepository;
++  final MedicineNameMatcher _medicineNameMatcher;
+ 
+   Future<MedicineLookupResult> searchByName(String query) async {
+     final normalizedQuery = query.trim();
+@@ -50,21 +68,47 @@ class MedicineLookupRepository {
+       final candidates = await _imageTextRecognizer.extractCandidates(
+         image: image,
+       );
++      debugPrint('Medicine image OCR candidates: $candidates');
++
++      final entries = await _medicineNameRepository.loadEntries();
++      final match = _medicineNameMatcher.match(
++        ocrCandidates: candidates,
++        entries: entries,
++      );
++      final cleanedText =
++          match?.cleanedText ??
++          _medicineNameMatcher.normalizeCombinedText(candidates);
++      debugPrint('Medicine image cleaned OCR text: $cleanedText');
++
++      if (match == null) {
++        debugPrint('Medicine image matched brand name: none');
++        debugPrint('Medicine image matched generic name: none');
++        throw const MedicineLookupRepositoryException(_noLocalMatchMessage);
++      }
++
++      debugPrint(
++        'Medicine image matched brand name: ${match.matchedBrandName ?? 'none'}',
++      );
++      debugPrint(
++        'Medicine image matched generic name: ${match.matchedGenericName ?? 'none'}',
++      );
+ 
+       MedicineLookupRepositoryException? firstLookupError;
+ 
+-      for (final candidate in candidates) {
++      for (final candidate in match.backendQueries) {
++        debugPrint('Medicine image final query sent to backend: $candidate');
+         try {
+           final result = await searchByName(candidate);
+           return result.copyWith(
+             query: candidate,
+             searchMode: 'image',
+             identificationReason:
+-                'Identified from text visible in the image.',
++                'Identified from OCR text by matching the local medicine list.',
++            matchedName: result.matchedName ?? match.preferredQuery,
++            genericName: result.genericName ?? match.matchedGenericName,
+           );
+         } on MedicineLookupRepositoryException catch (error) {
+-          if (error.message ==
+-              'No matching medicine was found. Try a brand name or generic name.') {
++          if (error.message == _noBackendMatchMessage) {
+             firstLookupError ??= error;
+             continue;
+           }
+@@ -75,8 +119,10 @@ class MedicineLookupRepository {
+ 
+       throw firstLookupError ??
+           const MedicineLookupRepositoryException(
+-            'No matching medicine was found in the image. Try a clearer photo with the medicine name visible.',
++            'No matching medicine details were found for the medicine identified from this image.',
+           );
++    } on local_medicine.MedicineNameRepositoryException catch (error) {
++      throw MedicineLookupRepositoryException(error.message);
+     } on MedicineImageTextRecognizerException catch (error) {
+       throw MedicineLookupRepositoryException(error.message);
+     } catch (error) {
+@@ -86,7 +132,7 @@ class MedicineLookupRepository {
+ 
+   String _friendlyNameSearchErrorMessage(ApiClientException error) {
+     if (error.statusCode == 404) {
+-      return 'No matching medicine was found. Try a brand name or generic name.';
++      return _noBackendMatchMessage;
+     }
+ 
+     return error.message;
+
+diff --git ".codex_backup\\medicine_lookup_repository_test.dart.bak" "test\\repositories\\medicine_lookup_repository_test.dart"
+index 14dd9c0..715ed68 100644
+--- ".codex_backup\\medicine_lookup_repository_test.dart.bak"
++++ "test\\repositories\\medicine_lookup_repository_test.dart"
+@@ -3,6 +3,8 @@ import 'dart:typed_data';
+ import 'package:flutter_test/flutter_test.dart';
+ import 'package:image_picker/image_picker.dart';
+ import 'package:smart_med/core/network/api_client.dart';
++import 'package:smart_med/data/medicine/medicine_name_entry.dart';
++import 'package:smart_med/data/medicine/medicine_name_repository.dart';
+ import 'package:smart_med/features/medicine_search/data/services/medicine_image_text_recognizer.dart';
+ import 'package:smart_med/features/medicine_search/data/repositories/medicine_lookup_repository.dart';
+ 
+@@ -49,7 +51,9 @@ void main() {
+       expect(result.alternatives.first.displayLabel, 'Advil (Brand name)');
+     });
+ 
+-    test('searches by image using OCR candidates and then name lookup', () async {
++    test(
++      'searches by image using a local exact match instead of the first OCR candidate',
++      () async {
+         final apiClient = _FakeApiClient(
+           getJsonHandler:
+               ({
+@@ -58,23 +62,23 @@ void main() {
+                 required Map<String, String> headers,
+               }) async {
+                 expect(path, '/medicine-information');
+-                expect(queryParameters['name'], 'Advil');
++                expect(queryParameters['name'], 'Paracetamol');
+ 
+                 return <String, dynamic>{
+-                  'query': 'Advil',
++                  'query': 'Paracetamol',
+                   'search_mode': 'name',
+-                  'medicine_name': 'Advil',
+-                  'generic_name': 'ibuprofen',
++                  'medicine_name': 'Paracetamol',
++                  'generic_name': 'Acetaminophen',
+                   'used_for': ['Pain relief'],
+                   'dose': ['Use as directed on the label'],
+-                  'warnings': ['Use carefully with stomach ulcers.'],
++                  'warnings': ['Avoid taking more than directed.'],
+                   'side_effects': ['Nausea'],
+-                  'interactions': ['May interact with anticoagulants'],
++                  'interactions': ['May interact with other pain relievers'],
+                   'alternatives': const <Map<String, dynamic>>[],
+                   'storage': ['Keep tightly closed'],
+                   'disclaimer': ['This is not personal medical advice.'],
+-                  'brand_names': ['Advil'],
+-                  'active_ingredients': ['Ibuprofen'],
++                  'brand_names': ['Paracetamol'],
++                  'active_ingredients': ['Acetaminophen'],
+                   'source': 'rxnorm+dailymed+openfda',
+                 };
+               },
+@@ -83,7 +87,19 @@ void main() {
+         final repository = MedicineLookupRepository(
+           apiClient: apiClient,
+           imageTextRecognizer: const _FakeImageTextRecognizer(
+-            candidates: <String>['Advil'],
++            candidates: <String>[
++              'Effective Pain Relief',
++              'PARACETAMOL 500mg Effective Pain Relief',
++            ],
++          ),
++          medicineNameRepository: _FakeMedicineNameRepository(
++            entries: const <MedicineNameEntry>[
++              MedicineNameEntry(
++                id: '1',
++                brandName: 'Paracetamol',
++                genericName: 'Acetaminophen',
++              ),
++            ],
+           ),
+         );
+         final image = XFile.fromData(
+@@ -94,13 +110,79 @@ void main() {
+         final result = await repository.searchByImage(image: image);
+ 
+         expect(result.isImageSearch, isTrue);
++        expect(result.query, 'Paracetamol');
+         expect(
+           result.identificationReason,
+-          'Identified from text visible in the image.',
++          'Identified from OCR text by matching the local medicine list.',
+         );
++        expect(apiClient.queries, <String>['Paracetamol']);
+       },
+     );
+ 
++    test('falls back from a matched brand name to its generic name', () async {
++      final apiClient = _FakeApiClient(
++        getJsonHandler:
++            ({
++              required String path,
++              required Map<String, String> queryParameters,
++              required Map<String, String> headers,
++            }) async {
++              expect(path, '/medicine-information');
++
++              if (queryParameters['name'] == 'Nurofen') {
++                throw const ApiClientException(
++                  'Medicine not found.',
++                  statusCode: 404,
++                );
++              }
++
++              expect(queryParameters['name'], 'Ibuprofen');
++              return <String, dynamic>{
++                'query': 'Ibuprofen',
++                'search_mode': 'name',
++                'medicine_name': 'Ibuprofen',
++                'generic_name': 'Ibuprofen',
++                'used_for': ['Pain relief'],
++                'dose': ['Use as directed on the label'],
++                'warnings': ['Use carefully with stomach ulcers.'],
++                'side_effects': ['Nausea'],
++                'interactions': ['May interact with anticoagulants'],
++                'alternatives': const <Map<String, dynamic>>[],
++                'storage': ['Keep tightly closed'],
++                'disclaimer': ['This is not personal medical advice.'],
++                'brand_names': ['Nurofen'],
++                'active_ingredients': ['Ibuprofen'],
++                'source': 'rxnorm+dailymed+openfda',
++              };
++            },
++      );
++
++      final repository = MedicineLookupRepository(
++        apiClient: apiClient,
++        imageTextRecognizer: const _FakeImageTextRecognizer(
++          candidates: <String>['Nurofen Pain Relief 200mg tablets'],
++        ),
++        medicineNameRepository: _FakeMedicineNameRepository(
++          entries: const <MedicineNameEntry>[
++            MedicineNameEntry(
++              id: '2',
++              brandName: 'Nurofen',
++              genericName: 'Ibuprofen',
++            ),
++          ],
++        ),
++      );
++      final image = XFile.fromData(
++        Uint8List.fromList(<int>[1, 2, 3]),
++        name: 'pill.png',
++        mimeType: 'image/png',
++      );
++      final result = await repository.searchByImage(image: image);
++
++      expect(result.query, 'Ibuprofen');
++      expect(apiClient.queries, <String>['Nurofen', 'Ibuprofen']);
++    });
++
+     test('rejects an empty name search before calling the API', () async {
+       final repository = MedicineLookupRepository(apiClient: _FakeApiClient());
+ 
+@@ -118,8 +200,7 @@ void main() {
+ 
+     test('surfaces OCR failure when no medicine text can be read', () async {
+       final repository = MedicineLookupRepository(
+-        apiClient: _FakeApiClient(
+-        ),
++        apiClient: _FakeApiClient(),
+         imageTextRecognizer: const _FakeImageTextRecognizer(
+           error: MedicineImageTextRecognizerException(
+             'No medicine name could be read from the image. Try a clearer photo with the label or pill markings visible.',
+@@ -144,6 +225,44 @@ void main() {
+         ),
+       );
+     });
++
++    test(
++      'stops image search when no local medicine name matches the OCR text',
++      () async {
++        final repository = MedicineLookupRepository(
++          apiClient: _FakeApiClient(),
++          imageTextRecognizer: const _FakeImageTextRecognizer(
++            candidates: <String>['Easy To Swallow'],
++          ),
++          medicineNameRepository: _FakeMedicineNameRepository(
++            entries: const <MedicineNameEntry>[
++              MedicineNameEntry(
++                id: '3',
++                brandName: 'Panadol',
++                genericName: 'Paracetamol',
++              ),
++            ],
++          ),
++        );
++
++        final image = XFile.fromData(
++          Uint8List.fromList(<int>[1, 2, 3]),
++          name: 'pill.png',
++          mimeType: 'image/png',
++        );
++
++        expect(
++          () => repository.searchByImage(image: image),
++          throwsA(
++            isA<MedicineLookupRepositoryException>().having(
++              (error) => error.message,
++              'message',
++              'No matching medicine name was found in the local medicine list for the text in this image. Try a clearer photo with the medicine name visible.',
++            ),
++          ),
++        );
++      },
++    );
+   });
+ }
+ 
+@@ -158,6 +277,7 @@ class _FakeApiClient extends ApiClient {
+   _FakeApiClient({this.getJsonHandler});
+ 
+   final _GetJsonHandler? getJsonHandler;
++  final List<String> queries = <String>[];
+ 
+   @override
+   Future<Map<String, dynamic>> getJson({
+@@ -165,6 +285,11 @@ class _FakeApiClient extends ApiClient {
+     Map<String, String> queryParameters = const <String, String>{},
+     Map<String, String> headers = const <String, String>{},
+   }) async {
++    final name = queryParameters['name'];
++    if (name != null) {
++      queries.add(name);
++    }
++
+     final handler = getJsonHandler;
+     if (handler == null) {
+       throw UnimplementedError('getJson was not expected in this test.');
+@@ -197,3 +322,12 @@ class _FakeImageTextRecognizer implements MedicineImageTextRecognizer {
+     return candidates;
+   }
+ }
++
++class _FakeMedicineNameRepository extends MedicineNameRepository {
++  _FakeMedicineNameRepository({required this.entries});
++
++  final List<MedicineNameEntry> entries;
++
++  @override
++  Future<List<MedicineNameEntry>> loadEntries() async => entries;
++}
+

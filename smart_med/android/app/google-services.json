@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "73601045868",
+    "project_id": "smartmed-20c2a",
+    "storage_bucket": "smartmed-20c2a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:73601045868:android:c690e38405ab7f9a354f49",
+        "android_client_info": {
+          "package_name": "com.example.smart_med"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCzXrMeL6Z4q-ITr-J3Av4wUaq9jJFgs6Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

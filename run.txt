@@ -1,0 +1,16 @@
+
+cd c:\lastJob\smart_medv0.55\smart_med\smart_med_api
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+
+
+
+
+
+cd c:\lastJob\smart_medv0.55\smart_med\smart_med
+flutter pub get
+flutter run -d adb-0871933291001209-3ng8ws._adb-tls-connect._tcp
+
+
+
+

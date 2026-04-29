@@ -1,0 +1,31 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "smartmed-20c2a",
+          "appId": "1:73601045868:android:c690e38405ab7f9a354f49",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "smartmed-20c2a",
+          "configurations": {
+            "android": "1:73601045868:android:c690e38405ab7f9a354f49",
+            "ios": "1:73601045868:ios:4167edf6f293291e354f49",
+            "macos": "1:73601045868:ios:4167edf6f293291e354f49",
+            "web": "1:73601045868:web:cd654db0017a3e0a354f49",
+            "windows": "1:73601045868:web:556d0f32e9d76ec8354f49"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

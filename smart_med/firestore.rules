@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.authUid == userId;
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/medications/{medicationId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.userId == userId;
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/reminders/{reminderId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.userId == userId;
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/allergies/{allergyId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.userId == userId;
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/medical_conditions/{conditionId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.userId == userId;
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/interaction_history/{historyId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.userId == userId;
+      allow delete: if isOwner(userId);
+    }
+
+    match /Users/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    match /Users/{userId}/{document=**} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    match /drug_catalog/{drugId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /drug_catalog/{drugId}/alternatives/{alternativeId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

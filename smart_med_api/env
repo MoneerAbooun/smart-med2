@@ -1,0 +1,4 @@
+# Smart Med API local configuration
+# Copy this file to .env and fill in your real values.
+
+GOOGLE_APPLICATION_CREDENTIALS=D:\develop\Smart_Med_App\smartmed-20c2a-firebase-adminsdk-fbsvc-5445071c85.json

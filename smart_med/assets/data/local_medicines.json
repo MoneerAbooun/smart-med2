@@ -1,0 +1,223 @@
+[
+  {"id":"1","brandName":"Acamol","genericName":"Paracetamol"},
+  {"id":"2","brandName":"Panadol","genericName":"Paracetamol"},
+  {"id":"3","brandName":"Panadol Extra","genericName":"Paracetamol + Caffeine"},
+  {"id":"4","brandName":"Fevadol","genericName":"Paracetamol"},
+  {"id":"5","brandName":"Adol","genericName":"Paracetamol"},
+
+  {"id":"6","brandName":"Nurofen","genericName":"Ibuprofen"},
+  {"id":"7","brandName":"Brufen","genericName":"Ibuprofen"},
+  {"id":"8","brandName":"Profen","genericName":"Ibuprofen"},
+
+  {"id":"9","brandName":"Optalgin","genericName":"Metamizole"},
+  {"id":"10","brandName":"Novalgin","genericName":"Metamizole"},
+
+  {"id":"11","brandName":"Augmentin","genericName":"Amoxicillin + Clavulanic Acid"},
+  {"id":"12","brandName":"Amoxil","genericName":"Amoxicillin"},
+  {"id":"13","brandName":"Clavox","genericName":"Amoxicillin + Clavulanic Acid"},
+
+  {"id":"14","brandName":"Zithromax","genericName":"Azithromycin"},
+  {"id":"15","brandName":"Klacid","genericName":"Clarithromycin"},
+  {"id":"16","brandName":"Suprax","genericName":"Cefixime"},
+
+  {"id":"17","brandName":"Cipro","genericName":"Ciprofloxacin"},
+  {"id":"18","brandName":"Tavanic","genericName":"Levofloxacin"},
+
+  {"id":"19","brandName":"Flagyl","genericName":"Metronidazole"},
+  {"id":"20","brandName":"Dalacin","genericName":"Clindamycin"},
+
+  {"id":"21","brandName":"Voltaren","genericName":"Diclofenac"},
+  {"id":"22","brandName":"Cataflam","genericName":"Diclofenac"},
+  {"id":"23","brandName":"Olfen","genericName":"Diclofenac"},
+
+  {"id":"24","brandName":"Aspirin","genericName":"Acetylsalicylic Acid"},
+  {"id":"25","brandName":"Cardiprin","genericName":"Aspirin"},
+
+  {"id":"26","brandName":"Losec","genericName":"Omeprazole"},
+  {"id":"27","brandName":"Nexium","genericName":"Esomeprazole"},
+  {"id":"28","brandName":"Controloc","genericName":"Pantoprazole"},
+
+  {"id":"29","brandName":"Zantac","genericName":"Ranitidine"},
+  {"id":"30","brandName":"Pepcid","genericName":"Famotidine"},
+
+  {"id":"31","brandName":"Glucophage","genericName":"Metformin"},
+  {"id":"32","brandName":"Diamicron","genericName":"Gliclazide"},
+
+  {"id":"33","brandName":"Amaryl","genericName":"Glimepiride"},
+  {"id":"34","brandName":"Januvia","genericName":"Sitagliptin"},
+
+  {"id":"35","brandName":"Norvasc","genericName":"Amlodipine"},
+  {"id":"36","brandName":"Adalat","genericName":"Nifedipine"},
+
+  {"id":"37","brandName":"Concor","genericName":"Bisoprolol"},
+  {"id":"38","brandName":"Tenormin","genericName":"Atenolol"},
+
+  {"id":"39","brandName":"Cozaar","genericName":"Losartan"},
+  {"id":"40","brandName":"Diovan","genericName":"Valsartan"},
+
+  {"id":"41","brandName":"Lasix","genericName":"Furosemide"},
+  {"id":"42","brandName":"Aldactone","genericName":"Spironolactone"},
+
+  {"id":"43","brandName":"Zocor","genericName":"Simvastatin"},
+  {"id":"44","brandName":"Lipitor","genericName":"Atorvastatin"},
+
+  {"id":"45","brandName":"Xanax","genericName":"Alprazolam"},
+  {"id":"46","brandName":"Valium","genericName":"Diazepam"},
+
+  {"id":"47","brandName":"Zoloft","genericName":"Sertraline"},
+  {"id":"48","brandName":"Prozac","genericName":"Fluoxetine"},
+
+  {"id":"49","brandName":"Aerius","genericName":"Desloratadine"},
+  {"id":"50","brandName":"Clarinase","genericName":"Loratadine + Pseudoephedrine"},
+
+  {"id":"51","brandName":"Telfast","genericName":"Fexofenadine"},
+  {"id":"52","brandName":"Zyrtec","genericName":"Cetirizine"},
+
+  {"id":"53","brandName":"Ventolin","genericName":"Salbutamol"},
+  {"id":"54","brandName":"Seretide","genericName":"Fluticasone + Salmeterol"},
+
+  {"id":"55","brandName":"Pulmicort","genericName":"Budesonide"},
+  {"id":"56","brandName":"Singulair","genericName":"Montelukast"},
+
+  {"id":"57","brandName":"Insulatard","genericName":"Insulin"},
+  {"id":"58","brandName":"Lantus","genericName":"Insulin Glargine"},
+
+  {"id":"59","brandName":"Humalog","genericName":"Insulin Lispro"},
+  {"id":"60","brandName":"Actrapid","genericName":"Insulin Human"},
+
+  {"id":"61","brandName":"Betnovate","genericName":"Betamethasone"},
+  {"id":"62","brandName":"Fucidin","genericName":"Fusidic Acid"},
+
+  {"id":"63","brandName":"Bepanthen","genericName":"Dexpanthenol"},
+  {"id":"64","brandName":"Canesten","genericName":"Clotrimazole"},
+
+  {"id":"65","brandName":"Mycospor","genericName":"Bifonazole"},
+  {"id":"66","brandName":"Travocort","genericName":"Isoconazole + Diflucortolone"},
+
+  {"id":"67","brandName":"Gaviscon","genericName":"Antacid"},
+  {"id":"68","brandName":"Maalox","genericName":"Antacid"},
+
+  {"id":"69","brandName":"Duphalac","genericName":"Lactulose"},
+  {"id":"70","brandName":"Imodium","genericName":"Loperamide"},
+
+  {"id":"71","brandName":"Duspatalin","genericName":"Mebeverine"},
+  {"id":"72","brandName":"Buscopan","genericName":"Hyoscine Butylbromide"},
+  {"id":"73","brandName":"Spasmo-Canulase","genericName":"Antispasmodic Combination"},
+
+  {"id":"74","brandName":"Motilium","genericName":"Domperidone"},
+  {"id":"75","brandName":"Primperan","genericName":"Metoclopramide"},
+
+  {"id":"76","brandName":"Allerfin","genericName":"Chlorpheniramine"},
+  {"id":"77","brandName":"Histazine","genericName":"Cetirizine"},
+
+  {"id":"78","brandName":"Flixonase","genericName":"Fluticasone"},
+  {"id":"79","brandName":"Avamys","genericName":"Fluticasone Furoate"},
+
+  {"id":"80","brandName":"Rhinocort","genericName":"Budesonide"},
+  {"id":"81","brandName":"Otrivin","genericName":"Xylometazoline"},
+
+  {"id":"82","brandName":"Nasivin","genericName":"Oxymetazoline"},
+  {"id":"83","brandName":"Sinupret","genericName":"Herbal Extract"},
+
+  {"id":"84","brandName":"Mucosolvan","genericName":"Ambroxol"},
+  {"id":"85","brandName":"Bisolvon","genericName":"Bromhexine"},
+
+  {"id":"86","brandName":"Fluimucil","genericName":"Acetylcysteine"},
+  {"id":"87","brandName":"ACC","genericName":"Acetylcysteine"},
+
+  {"id":"88","brandName":"Tussin","genericName":"Guaifenesin"},
+  {"id":"89","brandName":"Bronchicum","genericName":"Thyme Extract"},
+
+  {"id":"90","brandName":"Eucarbon","genericName":"Charcoal Combination"},
+  {"id":"91","brandName":"Normacol","genericName":"Bulk Laxative"},
+
+  {"id":"92","brandName":"Microlax","genericName":"Sodium Citrate"},
+  {"id":"93","brandName":"Movicol","genericName":"Macrogol"},
+
+  {"id":"94","brandName":"Xenical","genericName":"Orlistat"},
+  {"id":"95","brandName":"Reductil","genericName":"Sibutramine"},
+
+  {"id":"96","brandName":"Euthyrox","genericName":"Levothyroxine"},
+  {"id":"97","brandName":"Thyroxine","genericName":"Levothyroxine"},
+
+  {"id":"98","brandName":"Prednisolone","genericName":"Prednisolone"},
+  {"id":"99","brandName":"Medrol","genericName":"Methylprednisolone"},
+
+  {"id":"100","brandName":"Decadron","genericName":"Dexamethasone"},
+  {"id":"101","brandName":"Hydrocortisone","genericName":"Hydrocortisone"},
+
+  {"id":"102","brandName":"Ventolin Evohaler","genericName":"Salbutamol"},
+  {"id":"103","brandName":"Atrovent","genericName":"Ipratropium"},
+
+  {"id":"104","brandName":"Spiriva","genericName":"Tiotropium"},
+  {"id":"105","brandName":"Symbicort","genericName":"Budesonide + Formoterol"},
+
+  {"id":"106","brandName":"Foradil","genericName":"Formoterol"},
+  {"id":"107","brandName":"Serevent","genericName":"Salmeterol"},
+
+  {"id":"108","brandName":"Heparin","genericName":"Heparin"},
+  {"id":"109","brandName":"Clexane","genericName":"Enoxaparin"},
+
+  {"id":"110","brandName":"Plavix","genericName":"Clopidogrel"},
+  {"id":"111","brandName":"Brilinta","genericName":"Ticagrelor"},
+
+  {"id":"112","brandName":"Isoptin","genericName":"Verapamil"},
+  {"id":"113","brandName":"Cordarone","genericName":"Amiodarone"},
+
+  {"id":"114","brandName":"Digoxin","genericName":"Digoxin"},
+  {"id":"115","brandName":"Nitroderm","genericName":"Nitroglycerin"},
+
+  {"id":"116","brandName":"Imdur","genericName":"Isosorbide Mononitrate"},
+  {"id":"117","brandName":"Monocard","genericName":"Isosorbide Mononitrate"},
+
+  {"id":"118","brandName":"Zinnat","genericName":"Cefuroxime"},
+  {"id":"119","brandName":"Rocephin","genericName":"Ceftriaxone"},
+
+  {"id":"120","brandName":"Fortum","genericName":"Ceftazidime"},
+  {"id":"121","brandName":"Meronem","genericName":"Meropenem"},
+
+  {"id":"122","brandName":"Tazocin","genericName":"Piperacillin + Tazobactam"},
+  {"id":"123","brandName":"Vibramycin","genericName":"Doxycycline"},
+
+  {"id":"124","brandName":"Minocin","genericName":"Minocycline"},
+  {"id":"125","brandName":"Erythrocin","genericName":"Erythromycin"},
+
+  {"id":"126","brandName":"Diflucan","genericName":"Fluconazole"},
+  {"id":"127","brandName":"Sporanox","genericName":"Itraconazole"},
+
+  {"id":"128","brandName":"Nizoral","genericName":"Ketoconazole"},
+  {"id":"129","brandName":"Zovirax","genericName":"Acyclovir"},
+
+  {"id":"130","brandName":"Valtrex","genericName":"Valacyclovir"},
+  {"id":"131","brandName":"Tamiflu","genericName":"Oseltamivir"},
+
+  {"id":"132","brandName":"Arcoxia","genericName":"Etoricoxib"},
+  {"id":"133","brandName":"Celebrex","genericName":"Celecoxib"},
+
+  {"id":"134","brandName":"Mobic","genericName":"Meloxicam"},
+  {"id":"135","brandName":"Indocid","genericName":"Indomethacin"},
+
+  {"id":"136","brandName":"Allopurinol","genericName":"Allopurinol"},
+  {"id":"137","brandName":"Colchicine","genericName":"Colchicine"},
+
+  {"id":"138","brandName":"Fosamax","genericName":"Alendronate"},
+  {"id":"139","brandName":"Bonviva","genericName":"Ibandronate"},
+
+  {"id":"140","brandName":"Calcichew","genericName":"Calcium Carbonate"},
+  {"id":"141","brandName":"Osteocare","genericName":"Calcium + Vitamin D"},
+
+  {"id":"142","brandName":"Neurobion","genericName":"Vitamin B Complex"},
+  {"id":"143","brandName":"Feroglobin","genericName":"Iron Supplement"},
+
+  {"id":"144","brandName":"Maltofer","genericName":"Iron"},
+  {"id":"145","brandName":"Fefol","genericName":"Iron + Folic Acid"},
+
+  {"id":"146","brandName":"Centrum","genericName":"Multivitamin"},
+  {"id":"147","brandName":"Seven Seas","genericName":"Omega 3"},
+
+  {"id":"148","brandName":"Vitamin D3","genericName":"Cholecalciferol"},
+  {"id":"149","brandName":"Calciferol","genericName":"Vitamin D"},
+
+  {"id":"150","brandName":"Magnesium Diasporal","genericName":"Magnesium"},
+  {"id":"151","brandName":"Trofin","genericName":"Ibuprofen"}
+]
