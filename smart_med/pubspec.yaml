@@ -24,6 +24,7 @@ dependencies:
   google_mlkit_text_recognition: ^0.15.1
   firebase_database: ^12.3.0
   flutter_material_design_icons: ^3.0.0+7447
+  flutter_timezone: ^5.0.2
 
 
 

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:smart_med/core/firebase/firestore_paths.dart';
 import 'package:smart_med/core/services/notification_preferences_repository.dart';
-import 'package:timezone/data/latest.dart' as tz;
+import 'package:smart_med/core/services/timezone_service.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
@@ -32,8 +32,7 @@ class NotificationService {
   static Future<void> init() async {
     if (_isInitialized) return;
 
-    tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Asia/Hebron'));
+    await TimezoneService.initializeLocalTimezone();
 
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -88,7 +87,8 @@ class NotificationService {
     required int index,
     required String timeString,
   }) {
-    final String source = '${userId}_${medicationKey}_${index}_${timeString.trim()}';
+    final String source =
+        '${userId}_${medicationKey}_${index}_${timeString.trim()}';
     int hash = 0;
 
     for (int i = 0; i < source.length; i++) {
@@ -136,8 +136,10 @@ class NotificationService {
       return const <int>[];
     }
 
-    final String? effectiveUserId = userId ?? FirebaseAuth.instance.currentUser?.uid;
-    final String medicationKey = (medicationId != null && medicationId.trim().isNotEmpty)
+    final String? effectiveUserId =
+        userId ?? FirebaseAuth.instance.currentUser?.uid;
+    final String medicationKey =
+        (medicationId != null && medicationId.trim().isNotEmpty)
         ? medicationId.trim()
         : medicineName.trim();
 
@@ -290,8 +292,9 @@ class NotificationService {
       return TimeOfDay(hour: hour, minute: minute);
     }
 
-    final Match? twentyFourHourMatch = RegExp(r'^(\d{1,2}):(\d{2})$')
-        .firstMatch(value);
+    final Match? twentyFourHourMatch = RegExp(
+      r'^(\d{1,2}):(\d{2})$',
+    ).firstMatch(value);
 
     if (twentyFourHourMatch != null) {
       final int hour = int.parse(twentyFourHourMatch.group(1)!);

@@ -1,0 +1,303 @@
+input_text,generic_name,brand_name
+acetaminophen,acetaminophen,Tylenol
+tylenol,acetaminophen,Tylenol
+tylenol extra strength,acetaminophen,Tylenol
+paracetamol,acetaminophen,Tylenol
+acetaminophen 500 mg,acetaminophen,Tylenol
+apap,acetaminophen,Tylenol
+ibuprofen,ibuprofen,Advil
+advil,ibuprofen,Advil
+motrin,ibuprofen,Motrin
+ibuprofen 200mg,ibuprofen,Advil
+advil liqui gels,ibuprofen,Advil
+ibu profen,ibuprofen,Advil
+naproxen,naproxen,Aleve
+aleve,naproxen,Aleve
+naproxen sodium,naproxen,Aleve
+aleve tablets,naproxen,Aleve
+naprosyn,naproxen,Naprosyn
+naproxyn,naproxen,Aleve
+aspirin,aspirin,Bayer
+bayer aspirin,aspirin,Bayer
+acetylsalicylic acid,aspirin,Bayer
+asa,aspirin,Bayer
+bufferin,aspirin,Bufferin
+aspirin 81 mg,aspirin,Bayer
+metformin,metformin,Glucophage
+glucophage,metformin,Glucophage
+metformin er,metformin,Glucophage XR
+glucophage xr,metformin,Glucophage XR
+metforman,metformin,Glucophage
+metformin 500 mg,metformin,Glucophage
+amoxicillin,amoxicillin,Amoxil
+amoxil,amoxicillin,Amoxil
+amoxicillin clavulanate,amoxicillin,Augmentin
+augmentin,amoxicillin,Augmentin
+amox,amoxicillin,Amoxil
+amoxicilin,amoxicillin,Amoxil
+atorvastatin,atorvastatin,Lipitor
+lipitor,atorvastatin,Lipitor
+atorvastatin calcium,atorvastatin,Lipitor
+lipitor 20 mg,atorvastatin,Lipitor
+atorvastin,atorvastatin,Lipitor
+atorva,atorvastatin,Lipitor
+omeprazole,omeprazole,Prilosec
+prilosec,omeprazole,Prilosec
+omeprazole dr,omeprazole,Prilosec
+prilosec otc,omeprazole,Prilosec OTC
+omeprazol,omeprazole,Prilosec
+omeprazole 20 mg,omeprazole,Prilosec
+loratadine,loratadine,Claritin
+claritin,loratadine,Claritin
+loratadine 10 mg,loratadine,Claritin
+claritin redi tabs,loratadine,Claritin
+loratidine,loratadine,Claritin
+lorat,loratadine,Claritin
+cetirizine,cetirizine,Zyrtec
+zyrtec,cetirizine,Zyrtec
+cetirizine 10 mg,cetirizine,Zyrtec
+zyrtec allergy,cetirizine,Zyrtec
+ceterizine,cetirizine,Zyrtec
+cetiri zine,cetirizine,Zyrtec
+diphenhydramine,diphenhydramine,Benadryl
+benadryl,diphenhydramine,Benadryl
+diphenhydramine hcl,diphenhydramine,Benadryl
+benadryl allergy,diphenhydramine,Benadryl
+diphenhydramine 25 mg,diphenhydramine,Benadryl
+diphendydramine,diphenhydramine,Benadryl
+simvastatin,simvastatin,Zocor
+zocor,simvastatin,Zocor
+simvastatin 20 mg,simvastatin,Zocor
+simvastatin tablet,simvastatin,Zocor
+simvastin,simvastatin,Zocor
+zocor 40 mg,simvastatin,Zocor
+lisinopril,lisinopril,Prinivil
+prinivil,lisinopril,Prinivil
+zestril,lisinopril,Zestril
+lisinopril 10 mg,lisinopril,Prinivil
+lisinipril,lisinopril,Prinivil
+lisinopril hctz,lisinopril,Zestoretic
+albuterol,albuterol,Ventolin
+ventolin,albuterol,Ventolin
+proair,albuterol,ProAir
+albuterol inhaler,albuterol,Ventolin
+ventolin hfa,albuterol,Ventolin HFA
+albuteral,albuterol,Ventolin
+sertraline,sertraline,Zoloft
+zoloft,sertraline,Zoloft
+sertraline hcl,sertraline,Zoloft
+sertraline 50 mg,sertraline,Zoloft
+sertaline,sertraline,Zoloft
+zoloft tablet,sertraline,Zoloft
+tylenol tablet,acetaminophen,Tylenol
+tylenol 500mg,acetaminophen,Tylenol
+acetaminophen caplet,acetaminophen,Tylenol
+advil migraine,ibuprofen,Advil
+motrin ib,ibuprofen,Motrin
+ibuprofen tablet,ibuprofen,Advil
+aleve gelcaps,naproxen,Aleve
+naprosyn tablet,naproxen,Naprosyn
+naproxen 220 mg,naproxen,Aleve
+bayer low dose,aspirin,Bayer
+st joseph aspirin,aspirin,St. Joseph
+aspirin chewable,aspirin,Bayer
+glucophage tablet,metformin,Glucophage
+metformin xr 750,metformin,Glucophage XR
+metformin tablet,metformin,Glucophage
+amoxil capsule,amoxicillin,Amoxil
+amoxicillin 500 mg,amoxicillin,Amoxil
+amoxicillin capsule,amoxicillin,Amoxil
+lipitor tablet,atorvastatin,Lipitor
+atorvastatin 40mg,atorvastatin,Lipitor
+lipitor generic,atorvastatin,Lipitor
+prilosec capsule,omeprazole,Prilosec
+omeprazole otc,omeprazole,Prilosec OTC
+omeprazole capsule,omeprazole,Prilosec
+claritin tablet,loratadine,Claritin
+claritin 24 hour,loratadine,Claritin
+loratadine tablet,loratadine,Claritin
+zyrtec 10mg,cetirizine,Zyrtec
+cetirizine hcl,cetirizine,Zyrtec
+zyrtec tablet,cetirizine,Zyrtec
+benadryl capsule,diphenhydramine,Benadryl
+diphenhydramine sleep aid,diphenhydramine,Benadryl
+benadryl tablet,diphenhydramine,Benadryl
+zocor tablet,simvastatin,Zocor
+zocor 20 mg,simvastatin,Zocor
+zocor generic,simvastatin,Zocor
+simva statin,simvastatin,Zocor
+zestril tablet,lisinopril,Zestril
+prinivil tablet,lisinopril,Prinivil
+lisinopril tablet,lisinopril,Prinivil
+proventil,albuterol,Proventil
+proventil hfa,albuterol,Proventil HFA
+albuterol sulfate,albuterol,Ventolin
+zoloft 100 mg,sertraline,Zoloft
+sertraline tablet,sertraline,Zoloft
+zoloft generic,sertraline,Zoloft
+اكامول,acetaminophen,Acamol
+أكامول,acetaminophen,Acamol
+اكامول 500,acetaminophen,Acamol
+بنادول,acetaminophen,Panadol
+بانادول,acetaminophen,Panadol
+باراسيتامول,acetaminophen,Paracetamol
+تروفين,ibuprofen,Trufen
+تروفن,ibuprofen,Trufen
+تروفين 400,ibuprofen,Trufen
+بروفين,ibuprofen,Brufen
+بروفن,ibuprofen,Brufen
+ايبوبروفين,ibuprofen,Ibuprofen
+إيبوبروفين,ibuprofen,Ibuprofen
+اسبرين,aspirin,Aspirin
+أسبرين,aspirin,Aspirin
+اموكسيسيلين,amoxicillin,Amoxicillin
+أموكسيسيلين,amoxicillin,Amoxicillin
+سيتريزين,cetirizine,Cetirizine
+سيتريزين 10,cetirizine,Cetirizine
+لوراتادين,loratadine,Loratadine
+كلاريتين,loratadine,Claritin
+اوميبرازول,omeprazole,Omeprazole
+أوميبرازول,omeprazole,Omeprazole
+ميتفورمين,metformin,Metformin
+سيرترالين,sertraline,Sertraline
+زولوفت,sertraline,Zoloft
+أتورفاستاتين,atorvastatin,Atorvastatin
+اتورفاستاتين,atorvastatin,Atorvastatin
+سيمفاستاتين,simvastatin,Simvastatin
+ديفينهيدرامين,diphenhydramine,Diphenhydramine
+دي فين هيدرامين,diphenhydramine,Diphenhydramine
+البوتيرول,albuterol,Albuterol
+سالبيوتامول,albuterol,Salbutamol
+نابروكسين,naproxen,Naproxen
+ليسينوبريل,lisinopril,Lisinopril
+اكامول 500 ملغ,acetaminophen,Acamol
+اكامول 500 مجم,acetaminophen,Acamol
+اكامول اقراص,acetaminophen,Acamol
+اكامول حبوب,acetaminophen,Acamol
+اكامول شراب,acetaminophen,Acamol
+اكامول فورته,acetaminophen,Acamol
+بنادول 500,acetaminophen,Panadol
+بنادول 500 ملغ,acetaminophen,Panadol
+بنادول اكسترا,acetaminophen,Panadol Extra
+بانادول اكسترا,acetaminophen,Panadol Extra
+بانادول حبوب,acetaminophen,Panadol
+باراسيتامول 500,acetaminophen,Paracetamol
+باراسيتامول اقراص,acetaminophen,Paracetamol
+بارسيتامول,acetaminophen,Paracetamol
+باراسيتامول شراب,acetaminophen,Paracetamol
+تروفين 400 ملغ,ibuprofen,Trufen
+تروفين 400 مجم,ibuprofen,Trufen
+تروفين اقراص,ibuprofen,Trufen
+تروفين حبوب,ibuprofen,Trufen
+تروفين شراب,ibuprofen,Trufen
+تروفن 400,ibuprofen,Trufen
+بروفين 400,ibuprofen,Brufen
+بروفين 400 ملغ,ibuprofen,Brufen
+بروفين اقراص,ibuprofen,Brufen
+بروفين شراب,ibuprofen,Brufen
+بروفن 400,ibuprofen,Brufen
+ايبوبروفين 200,ibuprofen,Ibuprofen
+ايبوبروفين 400,ibuprofen,Ibuprofen
+ايبو بروفين,ibuprofen,Ibuprofen
+ايبو بروفين 400,ibuprofen,Ibuprofen
+اسبرين 81,aspirin,Aspirin
+اسبرين 100,aspirin,Aspirin
+اسبرين 500,aspirin,Aspirin
+اسبرين اطفال,aspirin,Aspirin
+اسبرين اقراص,aspirin,Aspirin
+اسبرين حبوب,aspirin,Aspirin
+اسبرين مغلف,aspirin,Aspirin
+اسبرن,aspirin,Aspirin
+اموكسيسيلين 500,amoxicillin,Amoxicillin
+اموكسيسيلين 500 ملغ,amoxicillin,Amoxicillin
+اموكسيسيلين 250,amoxicillin,Amoxicillin
+اموكسيسيلين كبسولات,amoxicillin,Amoxicillin
+اموكسيسيلين شراب,amoxicillin,Amoxicillin
+اموكسيسلين,amoxicillin,Amoxicillin
+اموكسيل,amoxicillin,Amoxil
+اوجمنتين,amoxicillin,Augmentin
+أوجمنتين,amoxicillin,Augmentin
+سيتريزين 10 ملغ,cetirizine,Cetirizine
+سيتريزين 10 مجم,cetirizine,Cetirizine
+سيتريزين اقراص,cetirizine,Cetirizine
+سيتريزين حبوب,cetirizine,Cetirizine
+سيتريزين شراب,cetirizine,Cetirizine
+زيرتك,cetirizine,Zyrtec
+زيرتيك,cetirizine,Zyrtec
+سيتيريزين,cetirizine,Cetirizine
+لوراتادين 10,loratadine,Loratadine
+لوراتادين 10 ملغ,loratadine,Loratadine
+لوراتادين اقراص,loratadine,Loratadine
+لوراتادين حبوب,loratadine,Loratadine
+كلاريتين 10,loratadine,Claritin
+كلاريتين 10 ملغ,loratadine,Claritin
+كلاريتين حبوب,loratadine,Claritin
+كلارتين,loratadine,Claritin
+اوميبرازول 20,omeprazole,Omeprazole
+اوميبرازول 20 ملغ,omeprazole,Omeprazole
+اوميبرازول كبسولات,omeprazole,Omeprazole
+اوميبرازول حبوب,omeprazole,Omeprazole
+اومبرازول,omeprazole,Omeprazole
+اوميبرازول معده,omeprazole,Omeprazole
+برايلوسك,omeprazole,Prilosec
+لوسك,omeprazole,Losec
+ميتفورمين 500,metformin,Metformin
+ميتفورمين 500 ملغ,metformin,Metformin
+ميتفورمين 850,metformin,Metformin
+ميتفورمين 1000,metformin,Metformin
+ميتفورمين اقراص,metformin,Metformin
+ميتفورمين حبوب,metformin,Metformin
+متفورمين,metformin,Metformin
+جلوكوفاج,metformin,Glucophage
+غلوكوفاج,metformin,Glucophage
+سيرترالين 50,sertraline,Sertraline
+سيرترالين 50 ملغ,sertraline,Sertraline
+سيرترالين 100,sertraline,Sertraline
+سيرترالين اقراص,sertraline,Sertraline
+سيرترالين حبوب,sertraline,Sertraline
+سترالين,sertraline,Sertraline
+زولوفت 50,sertraline,Zoloft
+زولوفت 100,sertraline,Zoloft
+زولفت,sertraline,Zoloft
+اتورفاستاتين 10,atorvastatin,Atorvastatin
+اتورفاستاتين 20,atorvastatin,Atorvastatin
+اتورفاستاتين 40,atorvastatin,Atorvastatin
+اتورفاستاتين حبوب,atorvastatin,Atorvastatin
+اتورفاستاتين اقراص,atorvastatin,Atorvastatin
+ليبيتور,atorvastatin,Lipitor
+ليبتور,atorvastatin,Lipitor
+سيمفاستاتين 20,simvastatin,Simvastatin
+سيمفاستاتين 40,simvastatin,Simvastatin
+سيمفاستاتين حبوب,simvastatin,Simvastatin
+سيمفاستاتين اقراص,simvastatin,Simvastatin
+سيمفستاتين,simvastatin,Simvastatin
+زوكور,simvastatin,Zocor
+ديفينهيدرامين 25,diphenhydramine,Diphenhydramine
+ديفينهيدرامين 25 ملغ,diphenhydramine,Diphenhydramine
+ديفينهيدرامين كبسولات,diphenhydramine,Diphenhydramine
+ديفينهيدرامين حبوب,diphenhydramine,Diphenhydramine
+ديفين هيدرامين,diphenhydramine,Diphenhydramine
+بنادريل,diphenhydramine,Benadryl
+بينادريل,diphenhydramine,Benadryl
+البوتيرول بخاخ,albuterol,Albuterol
+البوتيرول محلول,albuterol,Albuterol
+سالبيوتامول بخاخ,albuterol,Salbutamol
+سالبوتامول,albuterol,Salbutamol
+سالبوتامول بخاخ,albuterol,Salbutamol
+فنتولين,albuterol,Ventolin
+فينتولين,albuterol,Ventolin
+بخاخ فينتولين,albuterol,Ventolin
+نابروكسين 250,naproxen,Naproxen
+نابروكسين 500,naproxen,Naproxen
+نابروكسين اقراص,naproxen,Naproxen
+نابروكسين حبوب,naproxen,Naproxen
+نابروكسن,naproxen,Naproxen
+نابروسين,naproxen,Naprosyn
+اليف,naproxen,Aleve
+ليسينوبريل 10,lisinopril,Lisinopril
+ليسينوبريل 20,lisinopril,Lisinopril
+ليسينوبريل اقراص,lisinopril,Lisinopril
+ليسينوبريل حبوب,lisinopril,Lisinopril
+ليزينوبريل,lisinopril,Lisinopril
+زيستريل,lisinopril,Zestril
+برينيفيل,lisinopril,Prinivil

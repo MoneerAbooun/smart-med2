@@ -418,11 +418,13 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '•',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+                Container(
+                  width: 5,
+                  height: 5,
+                  margin: const EdgeInsets.only(top: 8),
+                  decoration: BoxDecoration(
                     color: colorScheme.primary,
+                    shape: BoxShape.circle,
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -440,17 +442,161 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
     );
   }
 
+  String? _cleanText(String? value) {
+    final text = value?.trim();
+    if (text == null || text.isEmpty) {
+      return null;
+    }
+
+    return text;
+  }
+
+  bool _sameText(String? first, String? second) {
+    final normalizedFirst = _cleanText(first)?.toLowerCase();
+    final normalizedSecond = _cleanText(second)?.toLowerCase();
+    return normalizedFirst != null && normalizedFirst == normalizedSecond;
+  }
+
+  List<String> _medicineDetailLines({
+    required String enteredName,
+    required String checkedQuery,
+    String? localBrandName,
+    String? localGenericName,
+    String? apiGenericName,
+  }) {
+    final lines = <String>[];
+    final localParts = <String>[];
+    final brandName = _cleanText(localBrandName);
+    final localGeneric = _cleanText(localGenericName);
+    final checkedName = _cleanText(checkedQuery);
+    final apiGeneric = _cleanText(apiGenericName);
+
+    if (brandName != null) {
+      localParts.add('brand: $brandName');
+    }
+    if (localGeneric != null) {
+      localParts.add('generic: $localGeneric');
+    }
+    if (localParts.isNotEmpty) {
+      lines.add('Local match: ${localParts.join(', ')}');
+    }
+
+    if (checkedName != null && !_sameText(checkedName, enteredName)) {
+      lines.add('Checked as: $checkedName');
+    }
+
+    if (apiGeneric != null &&
+        !_sameText(apiGeneric, localGeneric) &&
+        !_sameText(apiGeneric, checkedName)) {
+      lines.add('API generic: $apiGeneric');
+    }
+
+    return lines;
+  }
+
+  Widget _buildMedicineResolutionRow(
+    BuildContext context, {
+    required String label,
+    required String enteredName,
+    required List<String> detailLines,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.medication_outlined, size: 18, color: colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$label: $enteredName',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                if (detailLines.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  ...detailLines.map(
+                    (line) => Text(
+                      line,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMedicineResolutionSection(
+    BuildContext context,
+    DrugInteractionLookupResult result,
+  ) {
+    final firstEnteredName = _cleanText(result.firstEnteredName) ?? 'First';
+    final secondEnteredName = _cleanText(result.secondEnteredName) ?? 'Second';
+    final firstDetails = _medicineDetailLines(
+      enteredName: firstEnteredName,
+      checkedQuery: result.firstQuery,
+      localBrandName: result.firstLocalBrandName,
+      localGenericName: result.firstLocalGenericName,
+      apiGenericName: result.firstGenericName,
+    );
+    final secondDetails = _medicineDetailLines(
+      enteredName: secondEnteredName,
+      checkedQuery: result.secondQuery,
+      localBrandName: result.secondLocalBrandName,
+      localGenericName: result.secondLocalGenericName,
+      apiGenericName: result.secondGenericName,
+    );
+
+    if (firstDetails.isEmpty && secondDetails.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Resolved medicine names',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          _buildMedicineResolutionRow(
+            context,
+            label: 'First',
+            enteredName: firstEnteredName,
+            detailLines: firstDetails,
+          ),
+          _buildMedicineResolutionRow(
+            context,
+            label: 'Second',
+            enteredName: secondEnteredName,
+            detailLines: secondDetails,
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildResultCard(
     BuildContext context,
     DrugInteractionLookupResult result,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final hasMechanism = (result.mechanism ?? '').trim().isNotEmpty;
-    final resolvedDifferentFromQuery =
-        result.firstDrug.trim().toLowerCase() !=
-            result.firstQuery.trim().toLowerCase() ||
-        result.secondDrug.trim().toLowerCase() !=
-            result.secondQuery.trim().toLowerCase();
 
     return Container(
       width: double.infinity,
@@ -470,50 +616,17 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${result.firstDrug} + ${result.secondDrug}',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      result.summary,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              InteractionSeverityChip(severity: result.severity),
-            ],
+          Text(
+            '${result.firstDrug} + ${result.secondDrug}',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
-          if (resolvedDifferentFromQuery) ...[
-            const SizedBox(height: 14),
-            Text(
-              'You entered "${result.firstQuery}" and "${result.secondQuery}".',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-          if ((result.firstGenericName ?? '').isNotEmpty ||
-              (result.secondGenericName ?? '').isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Generic names: ${result.firstGenericName ?? result.firstDrug} and ${result.secondGenericName ?? result.secondDrug}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
+          const SizedBox(height: 8),
+          InteractionSeverityChip(severity: result.severity),
+          const SizedBox(height: 12),
+          Text(result.summary, style: Theme.of(context).textTheme.bodyLarge),
+          _buildMedicineResolutionSection(context, result),
           if (hasMechanism) ...[
             const SizedBox(height: 18),
             _buildBulletSection(

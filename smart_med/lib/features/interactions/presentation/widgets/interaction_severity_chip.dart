@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 
 class InteractionSeverityChip extends StatelessWidget {
-  const InteractionSeverityChip({
-    super.key,
-    required this.severity,
-  });
+  const InteractionSeverityChip({super.key, required this.severity});
 
   final String severity;
 
@@ -27,17 +24,19 @@ class InteractionSeverityChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _colorForSeverity(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        severity,
-        style: TextStyle(
-          color: color,
-          fontWeight: FontWeight.bold,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 260),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          severity,
+          textAlign: TextAlign.center,
+          softWrap: true,
+          style: TextStyle(color: color, fontWeight: FontWeight.bold),
         ),
       ),
     );

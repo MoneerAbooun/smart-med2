@@ -4,12 +4,12 @@ import 'package:camera/camera.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/features/alternative_drug/alternative_drug.dart';
 import 'package:smart_med/features/interactions/interactions.dart';
 import 'package:smart_med/features/medications/medications.dart';
 import 'package:smart_med/features/medicine_search/medicine_search.dart';
+import 'package:smart_med/features/profile/profile.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,24 +19,17 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const String _cameraPermissionPromptHandledKey =
-      'home_camera_permission_prompt_handled';
-
   final ImagePicker _picker = ImagePicker();
 
   bool isCameraOpened = false;
   bool isCapturing = false;
-  bool _showCameraPermissionPrompt = false;
+  bool _isScanPanelExpanded = false;
 
   CameraController? controller;
   Future<void>? initializeControllerFuture;
   XFile? selectedImage;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadCameraPermissionPromptDecision();
-  }
+  final Set<String> _handledDoseKeys = <String>{};
+  final Map<String, DateTime> _snoozedDoses = <String, DateTime>{};
 
   @override
   void dispose() {
@@ -64,6 +57,13 @@ class _HomePageState extends State<HomePage> {
       MaterialPageRoute(
         builder: (context) => const AlternativeDrugSearchPage(),
       ),
+    );
+  }
+
+  Future<void> _openProfilePage() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const ProfilePage()),
     );
   }
 
@@ -123,52 +123,6 @@ class _HomePageState extends State<HomePage> {
     await initializeControllerFuture;
   }
 
-  String _cameraPermissionPromptPreferenceKey() {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-
-    if (userId == null || userId.isEmpty) {
-      return _cameraPermissionPromptHandledKey;
-    }
-
-    return '${_cameraPermissionPromptHandledKey}_$userId';
-  }
-
-  Future<void> _loadCameraPermissionPromptDecision() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hasHandledPrompt =
-        prefs.getBool(_cameraPermissionPromptPreferenceKey()) ?? false;
-
-    if (!mounted || hasHandledPrompt) {
-      return;
-    }
-
-    setState(() {
-      _showCameraPermissionPrompt = true;
-    });
-  }
-
-  Future<void> _markCameraPermissionPromptHandled() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_cameraPermissionPromptPreferenceKey(), true);
-  }
-
-  Future<void> _dismissCameraPermissionPrompt() async {
-    await _markCameraPermissionPromptHandled();
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _showCameraPermissionPrompt = false;
-    });
-  }
-
-  Future<void> _handleAllowCameraPrompt() async {
-    await _dismissCameraPermissionPrompt();
-    await openCamera();
-  }
-
   Future<void> pickImageFromGallery() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
 
@@ -184,6 +138,7 @@ class _HomePageState extends State<HomePage> {
         selectedImage = image;
         isCameraOpened = false;
         isCapturing = false;
+        _isScanPanelExpanded = true;
       });
     }
   }
@@ -203,6 +158,7 @@ class _HomePageState extends State<HomePage> {
         isCameraOpened = true;
         selectedImage = null;
         isCapturing = false;
+        _isScanPanelExpanded = true;
       });
     } catch (e) {
       if (!mounted) return;
@@ -265,7 +221,12 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  String _displayName() {
+  String _displayName([UserProfileRecord? profile]) {
+    final profileName = profile?.displayName.trim();
+    if (profileName != null && profileName.isNotEmpty) {
+      return profileName.split(' ').first;
+    }
+
     final user = FirebaseAuth.instance.currentUser;
     final name = user?.displayName?.trim();
 
@@ -300,14 +261,6 @@ class _HomePageState extends State<HomePage> {
         onTap: _openInteractionChecker,
       ),
       _HomeActionItem(
-        icon: Icons.add_box_outlined,
-        title: 'Quick Add Med',
-        subtitle: 'Save and set reminders',
-        tooltip:
-            'Add a medication to your list and schedule reminder times so Smart Med can notify you later.',
-        onTap: _openAddMedication,
-      ),
-      _HomeActionItem(
         icon: Icons.medication_outlined,
         title: 'My Active Medications',
         subtitle: 'Review current medicines',
@@ -317,30 +270,31 @@ class _HomePageState extends State<HomePage> {
       ),
       _HomeActionItem(
         icon: Icons.find_replace_outlined,
-        title: 'Find Substitute Medicines',
-        subtitle: 'Explore similar options',
+        title: 'Related Medicines',
+        subtitle: 'Discuss alternatives safely',
         tooltip:
-            'Search for possible substitute medicines you can discuss with a doctor or pharmacist.',
+            'Search for related medicines you can discuss with a doctor or pharmacist before changing treatment.',
         onTap: _openAlternativeDrugSearch,
       ),
     ];
   }
 
-  Widget _buildHeroCard(BuildContext context) {
+  Widget _buildGreetingCard(BuildContext context, UserProfileRecord? profile) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.primary,
-        borderRadius: BorderRadius.circular(24),
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).shadowColor.withValues(alpha: 0.16),
-            blurRadius: 14,
-            offset: const Offset(0, 6),
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -348,28 +302,27 @@ class _HomePageState extends State<HomePage> {
         children: [
           AppIconBadge(
             icon: Icons.health_and_safety_outlined,
-            accentColor: colorScheme.onPrimary,
-            size: 58,
-            iconSize: 32,
-            borderRadius: 18,
+            accentColor: colorScheme.primary,
+            size: 50,
+            iconSize: 26,
+            borderRadius: 16,
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Hello, ${_displayName()}',
+                  'Hello, ${_displayName(profile)}',
                   style: textTheme.titleLarge?.copyWith(
-                    color: colorScheme.onPrimary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
-                  'Manage your medications with reminders, interaction checks, and quick medicine lookup tools.',
+                  'Here is what needs attention today.',
                   style: textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onPrimary.withValues(alpha: 0.92),
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -388,6 +341,712 @@ class _HomePageState extends State<HomePage> {
         style: Theme.of(
           context,
         ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  DateTime _startOfDay(DateTime value) {
+    return DateTime(value.year, value.month, value.day);
+  }
+
+  DateTime _endOfDay(DateTime value) {
+    return DateTime(value.year, value.month, value.day, 23, 59, 59, 999);
+  }
+
+  bool _isMedicationActiveOn(MedicationRecord medication, DateTime date) {
+    if (medication.status.trim().toLowerCase() != 'active') {
+      return false;
+    }
+
+    if (medication.scheduledTimes.isEmpty) {
+      return false;
+    }
+
+    final dayStart = _startOfDay(date);
+    final dayEnd = _endOfDay(date);
+    final startDate = medication.startDate;
+    final endDate = medication.endDate;
+
+    if (startDate != null && startDate.isAfter(dayEnd)) {
+      return false;
+    }
+
+    if (endDate != null && endDate.isBefore(dayStart)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  List<MedicationRecord> _activeMedications(List<MedicationRecord> items) {
+    final now = DateTime.now();
+    return items
+        .where((medication) => _isMedicationActiveOn(medication, now))
+        .toList(growable: false);
+  }
+
+  String _doseKey(MedicationRecord medication, DateTime scheduledAt) {
+    final medicationKey = medication.id ?? medication.name;
+    return '$medicationKey-${scheduledAt.year}-${scheduledAt.month}-${scheduledAt.day}-${scheduledAt.hour}-${scheduledAt.minute}';
+  }
+
+  List<_HomeDose> _buildDoseTimeline(List<MedicationRecord> medications) {
+    final now = DateTime.now();
+    final today = _startOfDay(now);
+    final doses = <_HomeDose>[];
+
+    for (int dayOffset = 0; dayOffset <= 1; dayOffset++) {
+      final date = today.add(Duration(days: dayOffset));
+      for (final medication in medications) {
+        if (!_isMedicationActiveOn(medication, date)) {
+          continue;
+        }
+
+        for (final scheduledTime in medication.scheduledTimes) {
+          final scheduledAt = DateTime(
+            date.year,
+            date.month,
+            date.day,
+            scheduledTime.hour,
+            scheduledTime.minute,
+          );
+          final key = _doseKey(medication, scheduledAt);
+
+          if (_handledDoseKeys.contains(key)) {
+            continue;
+          }
+
+          final snoozedUntil = _snoozedDoses[key];
+          doses.add(
+            _HomeDose(
+              medication: medication,
+              scheduledAt: scheduledAt,
+              displayAt: snoozedUntil ?? scheduledAt,
+              key: key,
+              isSnoozed: snoozedUntil != null,
+            ),
+          );
+        }
+      }
+    }
+
+    doses.sort((left, right) => left.displayAt.compareTo(right.displayAt));
+    return doses;
+  }
+
+  List<_HomeDose> _buildTodayDoses(List<MedicationRecord> medications) {
+    final now = DateTime.now();
+    final today = _startOfDay(now);
+
+    return _buildDoseTimeline(medications)
+        .where((dose) {
+          return _startOfDay(dose.scheduledAt) == today;
+        })
+        .toList(growable: false);
+  }
+
+  String _formatDoseTime(BuildContext context, DateTime value) {
+    return TimeOfDay.fromDateTime(value).format(context);
+  }
+
+  String _relativeDoseLabel(_HomeDose dose) {
+    final now = DateTime.now();
+    final today = _startOfDay(now);
+    final doseDay = _startOfDay(dose.displayAt);
+
+    if (dose.isSnoozed) {
+      return 'Snoozed';
+    }
+
+    if (dose.displayAt.isBefore(now)) {
+      return 'Overdue';
+    }
+
+    if (doseDay == today) {
+      return 'Today';
+    }
+
+    return 'Tomorrow';
+  }
+
+  void _showHomeMessage(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  void _markDoseHandled(_HomeDose dose, String action) {
+    setState(() {
+      _handledDoseKeys.add(dose.key);
+      _snoozedDoses.remove(dose.key);
+    });
+
+    _showHomeMessage('${dose.medication.name} marked as $action.');
+  }
+
+  void _snoozeDose(_HomeDose dose) {
+    final snoozedUntil = DateTime.now().add(const Duration(minutes: 15));
+
+    setState(() {
+      _snoozedDoses[dose.key] = snoozedUntil;
+    });
+
+    _showHomeMessage(
+      '${dose.medication.name} snoozed until ${_formatDoseTime(context, snoozedUntil)}.',
+    );
+  }
+
+  Widget _buildNextDoseCard({
+    required BuildContext context,
+    required List<MedicationRecord> medications,
+    required bool isLoading,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final activeMedications = _activeMedications(medications);
+    final timeline = _buildDoseTimeline(activeMedications);
+    final nextDose = timeline.isEmpty ? null : timeline.first;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colorScheme.primary,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).shadowColor.withValues(alpha: 0.16),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: isLoading
+          ? Row(
+              children: [
+                SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.2,
+                    color: colorScheme.onPrimary,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    'Loading today\'s medication schedule...',
+                    style: textTheme.bodyLarge?.copyWith(
+                      color: colorScheme.onPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : nextDose == null
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    AppIconBadge(
+                      icon: activeMedications.isEmpty
+                          ? Icons.add_box_outlined
+                          : Icons.check_circle_outline,
+                      accentColor: colorScheme.onPrimary,
+                      size: 54,
+                      iconSize: 28,
+                      borderRadius: 18,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        activeMedications.isEmpty
+                            ? 'No active medications yet'
+                            : 'No more doses today',
+                        style: textTheme.titleLarge?.copyWith(
+                          color: colorScheme.onPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  activeMedications.isEmpty
+                      ? 'Add your first medicine to see your next dose here.'
+                      : 'You are clear for the rest of today based on your current schedule.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onPrimary.withValues(alpha: 0.92),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _openAddMedication,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Medication'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colorScheme.onPrimary,
+                      foregroundColor: colorScheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppIconBadge(
+                      icon: Icons.notifications_active_outlined,
+                      accentColor: colorScheme.onPrimary,
+                      size: 54,
+                      iconSize: 28,
+                      borderRadius: 18,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Next Dose',
+                            style: textTheme.titleSmall?.copyWith(
+                              color: colorScheme.onPrimary.withValues(
+                                alpha: 0.9,
+                              ),
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            nextDose.medication.name,
+                            style: textTheme.titleLarge?.copyWith(
+                              color: colorScheme.onPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.onPrimary.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        _relativeDoseLabel(nextDose),
+                        style: textTheme.labelMedium?.copyWith(
+                          color: colorScheme.onPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '${nextDose.medication.dosage} at ${_formatDoseTime(context, nextDose.displayAt)}',
+                  style: textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onPrimary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if ((nextDose.medication.instructions ?? '').trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text(
+                      nextDose.medication.instructions!.trim(),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onPrimary.withValues(alpha: 0.92),
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () => _markDoseHandled(nextDose, 'taken'),
+                      icon: const Icon(Icons.check),
+                      label: const Text('Taken'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colorScheme.onPrimary,
+                        foregroundColor: colorScheme.primary,
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _snoozeDose(nextDose),
+                      icon: const Icon(Icons.snooze),
+                      label: const Text('Snooze'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: colorScheme.onPrimary,
+                        side: BorderSide(
+                          color: colorScheme.onPrimary.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () => _markDoseHandled(nextDose, 'skipped'),
+                      icon: const Icon(Icons.close),
+                      label: const Text('Skip'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: colorScheme.onPrimary,
+                        side: BorderSide(
+                          color: colorScheme.onPrimary.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+    );
+  }
+
+  int _profileReadinessCount(
+    UserProfileRecord? profile,
+    int activeMedicationCount,
+  ) {
+    if (profile == null) {
+      return activeMedicationCount > 0 ? 1 : 0;
+    }
+
+    return <bool>[
+      profile.age != null,
+      profile.allergyNames.isNotEmpty,
+      profile.medicalConditionNames.isNotEmpty,
+      profile.weightKg != null,
+      profile.systolicPressure != null && profile.diastolicPressure != null,
+      activeMedicationCount > 0,
+    ].where((item) => item).length;
+  }
+
+  List<String> _missingSafetyItems(
+    UserProfileRecord? profile,
+    int activeMedicationCount,
+  ) {
+    return <String>[
+      if (profile?.age == null) 'Age',
+      if (profile == null || profile.allergyNames.isEmpty) 'Allergies',
+      if (profile == null || profile.medicalConditionNames.isEmpty)
+        'Conditions',
+      if (profile?.weightKg == null) 'Weight',
+      if (profile?.systolicPressure == null ||
+          profile?.diastolicPressure == null)
+        'Blood Pressure',
+      if (activeMedicationCount == 0) 'Active Meds',
+    ];
+  }
+
+  Widget _buildSafetyStatusCard({
+    required BuildContext context,
+    required UserProfileRecord? profile,
+    required List<MedicationRecord> activeMedications,
+    required bool isLoading,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final completed = _profileReadinessCount(profile, activeMedications.length);
+    final missing = _missingSafetyItems(profile, activeMedications.length);
+    final isComplete = completed == 6;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppIconBadge(
+                icon: isComplete
+                    ? Icons.verified_user_outlined
+                    : Icons.shield_outlined,
+                accentColor: isComplete
+                    ? const Color(0xFF2E7D6F)
+                    : colorScheme.primary,
+                size: 46,
+                iconSize: 23,
+                borderRadius: 15,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Safety Status',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isLoading
+                          ? 'Loading your safety profile...'
+                          : isComplete
+                          ? 'Your profile has the key details for stronger warnings.'
+                          : 'Profile $completed/6 complete. Add missing details for better safety checks.',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!isLoading) ...[
+            const SizedBox(height: 12),
+            Text(
+              '${profile?.allergyNames.length ?? 0} allergies, '
+              '${profile?.medicalConditionNames.length ?? 0} conditions, '
+              '${activeMedications.length} active meds',
+              style: textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (missing.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: missing
+                    .take(4)
+                    .map((label) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: colorScheme.secondaryContainer,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          label,
+                          style: textTheme.labelMedium?.copyWith(
+                            color: colorScheme.onSecondaryContainer,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      );
+                    })
+                    .toList(growable: false),
+              ),
+            ],
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _openProfilePage,
+                    icon: const Icon(Icons.person_outline),
+                    label: const Text('Complete Profile'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _openInteractionChecker,
+                    icon: const Icon(Icons.compare_arrows_outlined),
+                    label: const Text('Check Meds'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickStartCard(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Quick Start',
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _openAddMedication,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Med'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _isScanPanelExpanded = !_isScanPanelExpanded;
+                    });
+                  },
+                  icon: const Icon(Icons.document_scanner_outlined),
+                  label: const Text('Scan'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTodayMedicationsCard({
+    required BuildContext context,
+    required List<MedicationRecord> activeMedications,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final todayDoses = _buildTodayDoses(activeMedications);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const AppIconBadge(
+                icon: Icons.today_outlined,
+                size: 42,
+                iconSize: 22,
+                borderRadius: 14,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Today\'s Medications',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _openMedicationList,
+                child: const Text('View All'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (todayDoses.isEmpty)
+            Text(
+              activeMedications.isEmpty
+                  ? 'No active medications yet.'
+                  : 'No more scheduled doses today.',
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            )
+          else
+            Column(
+              children: todayDoses
+                  .take(5)
+                  .map((dose) {
+                    final isHandled = _handledDoseKeys.contains(dose.key);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: isHandled
+                                  ? colorScheme.primaryContainer
+                                  : colorScheme.surfaceContainerHighest,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant,
+                              ),
+                            ),
+                            child: Icon(
+                              isHandled
+                                  ? Icons.check_circle_outline
+                                  : Icons.medication_outlined,
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  dose.medication.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  dose.medication.dosage,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            _formatDoseTime(context, dose.displayAt),
+                            style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  })
+                  .toList(growable: false),
+            ),
+        ],
       ),
     );
   }
@@ -704,164 +1363,140 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildCameraPermissionOverlay(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
 
-    return Positioned.fill(
-      child: Material(
-        color: Colors.black54,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 380),
-              child: Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: colorScheme.surface,
-                  borderRadius: BorderRadius.circular(28),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Theme.of(
-                        context,
-                      ).shadowColor.withValues(alpha: 0.22),
-                      blurRadius: 24,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    AppIconBadge(
-                      icon: Icons.photo_camera_outlined,
-                      accentColor: colorScheme.onPrimaryContainer,
-                      size: 56,
-                      iconSize: 30,
-                      borderRadius: 18,
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      'Smart Med would like camera access',
-                      style: textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      'Why? So you can scan medicine bottles instantly.',
-                      style: textTheme.bodyLarge?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _dismissCameraPermissionPrompt,
-                            child: const Text("I'll Skip"),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: _handleAllowCameraPrompt,
-                            child: const Text('Allow Camera'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: Text('No logged in user found')),
+      );
+    }
+
+    return SafeArea(
+      child: Scaffold(
+        extendBody: true,
+        appBar: AppBar(
+          toolbarHeight: 70,
+          centerTitle: true,
+          automaticallyImplyLeading: false,
+          leadingWidth: 56,
+          leading: const SizedBox(),
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(shape: BoxShape.circle),
+                clipBehavior: Clip.antiAlias,
+                child: Image.asset('assets/Capsule.png', fit: BoxFit.cover),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Smart Med',
+                style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          actions: [
+            SizedBox(
+              width: 56,
+              child: IconButton(
+                icon: const Icon(Icons.medication_outlined, size: 28),
+                tooltip: 'Medications',
+                onPressed: _openMedicationList,
               ),
             ),
-          ),
+          ],
+        ),
+        body: StreamBuilder<List<MedicationRecord>>(
+          stream: medicationRepository.watchMedicationRecords(uid: user.uid),
+          builder: (context, medicationSnapshot) {
+            final medications =
+                medicationSnapshot.data ?? const <MedicationRecord>[];
+            final isLoadingMedications =
+                medicationSnapshot.connectionState == ConnectionState.waiting &&
+                !medicationSnapshot.hasData;
+
+            return StreamBuilder<UserProfileRecord?>(
+              stream: profileRepository.watchProfile(uid: user.uid),
+              builder: (context, profileSnapshot) {
+                final profile = profileSnapshot.data;
+                final isLoadingProfile =
+                    profileSnapshot.connectionState ==
+                        ConnectionState.waiting &&
+                    !profileSnapshot.hasData;
+                final activeMedications = _activeMedications(medications);
+
+                return Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 16,
+                    ),
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 430),
+                      child: Column(
+                        children: [
+                          _buildGreetingCard(context, profile),
+                          const SizedBox(height: 14),
+                          _buildNextDoseCard(
+                            context: context,
+                            medications: medications,
+                            isLoading: isLoadingMedications,
+                          ),
+                          const SizedBox(height: 14),
+                          _buildSafetyStatusCard(
+                            context: context,
+                            profile: profile,
+                            activeMedications: activeMedications,
+                            isLoading: isLoadingProfile,
+                          ),
+                          const SizedBox(height: 14),
+                          _buildQuickStartCard(context),
+                          if (_isScanPanelExpanded) ...[
+                            const SizedBox(height: 14),
+                            _buildScanMedicineCard(context),
+                          ],
+                          const SizedBox(height: 14),
+                          _buildTodayMedicationsCard(
+                            context: context,
+                            activeMedications: activeMedications,
+                          ),
+                          const SizedBox(height: 18),
+                          _buildSectionTitle(context, 'Tools'),
+                          const SizedBox(height: 12),
+                          _buildActionGrid(context),
+                          const SizedBox(height: 80),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            );
+          },
         ),
       ),
     );
   }
+}
 
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Stack(
-        children: [
-          Scaffold(
-            extendBody: true,
-            appBar: AppBar(
-              toolbarHeight: 70,
-              centerTitle: true,
-              automaticallyImplyLeading: false,
-              leadingWidth: 56,
-              leading: const SizedBox(),
-              title: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: const BoxDecoration(shape: BoxShape.circle),
-                    clipBehavior: Clip.antiAlias,
-                    child: Image.asset('assets/Capsule.png', fit: BoxFit.cover),
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Smart Med',
-                    style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              actions: [
-                SizedBox(
-                  width: 56,
-                  child: IconButton(
-                    icon: const Icon(Icons.medication_outlined, size: 28),
-                    tooltip: 'Medications',
-                    onPressed: _openMedicationList,
-                  ),
-                ),
-              ],
-            ),
-            body: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 16,
-                ),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 430),
-                  child: Column(
-                    children: [
-                      _buildHeroCard(context),
+class _HomeDose {
+  const _HomeDose({
+    required this.medication,
+    required this.scheduledAt,
+    required this.displayAt,
+    required this.key,
+    required this.isSnoozed,
+  });
 
-                      const SizedBox(height: 16),
-
-                      _buildScanMedicineCard(context),
-
-                      const SizedBox(height: 18),
-
-                      _buildSectionTitle(context, 'Quick Actions'),
-
-                      const SizedBox(height: 12),
-
-                      _buildActionGrid(context),
-
-                      const SizedBox(height: 80),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          if (_showCameraPermissionPrompt)
-            _buildCameraPermissionOverlay(context),
-        ],
-      ),
-    );
-  }
+  final MedicationRecord medication;
+  final DateTime scheduledAt;
+  final DateTime displayAt;
+  final String key;
+  final bool isSnoozed;
 }
 
 class _TileTooltipButton extends StatelessWidget {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException
 
+from app.ml.drug_name_model import predict_generic_name
 from app.models.drug_models import DrugAlternativeItem
 from app.models.medicine_models import MedicineInformationResponse
 from app.services.dailymed_service import get_spl_by_rxcui
@@ -9,6 +10,7 @@ from app.services.openfda_service import extract_label_sections, get_label_by_ge
 from app.services.rxnorm_service import get_related_concepts_by_type, resolve_drug_name
 
 RELATED_TERM_TYPES = ["SCD", "SBD", "GPCK", "BPCK", "BN"]
+MIN_PREDICTED_GENERIC_CONFIDENCE = 0.65
 
 CATEGORY_BY_TERM_TYPE = {
     "SCD": "Generic drug",
@@ -99,19 +101,56 @@ def _build_disclaimer_items(sections: dict[str, list[str]]) -> list[str]:
     return _unique_strings(items)
 
 
-async def _resolve_label_and_identity(query: str) -> tuple[str, str | None, dict[str, list[str]], str | None]:
+def _predicted_generic_query(query: str) -> str | None:
+    try:
+        prediction = predict_generic_name(query)
+    except (FileNotFoundError, ValueError):
+        return None
+
+    predicted_generic_name = str(
+        prediction.get("predicted_generic_name") or ""
+    ).strip()
+    if not predicted_generic_name:
+        return None
+
+    confidence = prediction.get("confidence")
+    if confidence is None or confidence < MIN_PREDICTED_GENERIC_CONFIDENCE:
+        return None
+
+    if _normalized_text(predicted_generic_name) == _normalized_text(query):
+        return None
+
+    return predicted_generic_name
+
+
+async def _resolve_label_and_identity(
+    query: str,
+) -> tuple[str, str | None, dict[str, list[str]], str | None]:
     rxcui, matched_name = await resolve_drug_name(query)
+    resolved_query = query
+
+    if rxcui is None:
+        predicted_generic_name = _predicted_generic_query(query)
+        if predicted_generic_name is not None:
+            rxcui, matched_name = await resolve_drug_name(predicted_generic_name)
+            if rxcui is not None:
+                resolved_query = predicted_generic_name
+
     if rxcui is None:
         raise HTTPException(status_code=404, detail="Drug not found in RxNorm")
 
     spl = await get_spl_by_rxcui(rxcui)
     set_id = spl.get("setid") if isinstance(spl, dict) else None
 
-    lookup_name = matched_name or query
+    lookup_name = matched_name or resolved_query
     label_record = await get_label_by_generic_or_brand_name(lookup_name)
 
-    if label_record is None and matched_name and matched_name.lower() != query.lower():
-        label_record = await get_label_by_generic_or_brand_name(query)
+    if (
+        label_record is None
+        and matched_name
+        and matched_name.lower() != resolved_query.lower()
+    ):
+        label_record = await get_label_by_generic_or_brand_name(resolved_query)
 
     sections = extract_label_sections(label_record or {})
     return rxcui, matched_name, sections, set_id
