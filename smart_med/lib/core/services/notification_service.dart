@@ -7,6 +7,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:smart_med/core/firebase/firestore_paths.dart';
 import 'package:smart_med/core/services/notification_preferences_repository.dart';
 import 'package:smart_med/core/services/timezone_service.dart';
+import 'package:smart_med/core/utils/localized_time_parser.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
@@ -111,6 +112,22 @@ class NotificationService {
       startDate: startDate,
     );
 
+    await _scheduleMedicationReminderAt(
+      id: id,
+      medicineName: medicineName,
+      scheduledDate: scheduledDate,
+      body: body,
+      matchDateTimeComponents: DateTimeComponents.time,
+    );
+  }
+
+  static Future<void> _scheduleMedicationReminderAt({
+    required int id,
+    required String medicineName,
+    required tz.TZDateTime scheduledDate,
+    String? body,
+    DateTimeComponents? matchDateTimeComponents,
+  }) async {
     await _flutterLocalNotificationsPlugin.zonedSchedule(
       id,
       'Medication Reminder',
@@ -120,7 +137,7 @@ class NotificationService {
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-      matchDateTimeComponents: DateTimeComponents.time,
+      matchDateTimeComponents: matchDateTimeComponents,
     );
   }
 
@@ -131,6 +148,7 @@ class NotificationService {
     String? userId,
     String? medicationId,
     DateTime? startDate,
+    DateTime? endDate,
   }) async {
     if (!await areNotificationsEnabled()) {
       return const <int>[];
@@ -149,24 +167,53 @@ class NotificationService {
       final String time = times[i].trim();
 
       try {
-        final int id = effectiveUserId != null
-            ? generateStableNotificationId(
-                userId: effectiveUserId,
-                medicationKey: medicationKey,
-                index: i,
-                timeString: time,
-              )
-            : generateNotificationId();
+        if (endDate != null) {
+          final scheduledDates = _instancesOfTimeThroughEndDate(
+            _parseTimeString(time),
+            startDate: startDate,
+            endDate: endDate,
+          );
 
-        await scheduleDailyMedicationReminder(
-          id: id,
-          medicineName: medicineName,
-          timeString: time,
-          startDate: startDate,
-          body: body,
-        );
+          for (final scheduledDate in scheduledDates) {
+            final dateStampedTime = '$time-${_dateStamp(scheduledDate)}';
+            final int id = effectiveUserId != null
+                ? generateStableNotificationId(
+                    userId: effectiveUserId,
+                    medicationKey: medicationKey,
+                    index: i,
+                    timeString: dateStampedTime,
+                  )
+                : generateNotificationId();
 
-        notificationIds.add(id);
+            await _scheduleMedicationReminderAt(
+              id: id,
+              medicineName: medicineName,
+              scheduledDate: scheduledDate,
+              body: body,
+            );
+
+            notificationIds.add(id);
+          }
+        } else {
+          final int id = effectiveUserId != null
+              ? generateStableNotificationId(
+                  userId: effectiveUserId,
+                  medicationKey: medicationKey,
+                  index: i,
+                  timeString: time,
+                )
+              : generateNotificationId();
+
+          await scheduleDailyMedicationReminder(
+            id: id,
+            medicineName: medicineName,
+            timeString: time,
+            startDate: startDate,
+            body: body,
+          );
+
+          notificationIds.add(id);
+        }
       } catch (e) {
         debugPrint('Failed to schedule reminder for time "$time": $e');
       }
@@ -217,6 +264,7 @@ class NotificationService {
       }
 
       final DateTime? startDate = _parseStoredDate(data['startDate']);
+      final DateTime? endDate = _parseStoredDate(data['endDate']);
 
       final List<int> notificationIds = await scheduleMedicationReminders(
         medicineName: medicineName,
@@ -225,6 +273,7 @@ class NotificationService {
         userId: uid,
         medicationId: doc.id,
         startDate: startDate,
+        endDate: endDate,
       );
 
       try {
@@ -268,46 +317,9 @@ class NotificationService {
   }
 
   static TimeOfDay _parseTimeString(String timeString) {
-    final String value = timeString.trim().toUpperCase();
+    final parsedTime = LocalizedTimeParser.parse(timeString);
 
-    final Match? meridiemMatch = RegExp(
-      r'^(\d{1,2}):(\d{2})\s?(AM|PM)$',
-    ).firstMatch(value);
-
-    if (meridiemMatch != null) {
-      int hour = int.parse(meridiemMatch.group(1)!);
-      final int minute = int.parse(meridiemMatch.group(2)!);
-      final String period = meridiemMatch.group(3)!;
-
-      if (hour < 1 || hour > 12 || minute < 0 || minute > 59) {
-        throw FormatException('Invalid time value: $timeString');
-      }
-
-      if (period == 'PM' && hour != 12) {
-        hour += 12;
-      } else if (period == 'AM' && hour == 12) {
-        hour = 0;
-      }
-
-      return TimeOfDay(hour: hour, minute: minute);
-    }
-
-    final Match? twentyFourHourMatch = RegExp(
-      r'^(\d{1,2}):(\d{2})$',
-    ).firstMatch(value);
-
-    if (twentyFourHourMatch != null) {
-      final int hour = int.parse(twentyFourHourMatch.group(1)!);
-      final int minute = int.parse(twentyFourHourMatch.group(2)!);
-
-      if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
-        throw FormatException('Invalid time value: $timeString');
-      }
-
-      return TimeOfDay(hour: hour, minute: minute);
-    }
-
-    throw FormatException('Invalid time format: $timeString');
+    return TimeOfDay(hour: parsedTime.hour, minute: parsedTime.minute);
   }
 
   static tz.TZDateTime _nextInstanceOfTime(
@@ -342,6 +354,58 @@ class NotificationService {
     }
 
     return scheduledDate;
+  }
+
+  static List<tz.TZDateTime> _instancesOfTimeThroughEndDate(
+    TimeOfDay time, {
+    DateTime? startDate,
+    required DateTime endDate,
+  }) {
+    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+    final DateTime activeStart = startDate != null && startDate.isAfter(now)
+        ? startDate
+        : now;
+    DateTime cursor = DateTime(
+      activeStart.year,
+      activeStart.month,
+      activeStart.day,
+    );
+    final DateTime lastDate = DateTime(
+      endDate.year,
+      endDate.month,
+      endDate.day,
+    );
+
+    if (lastDate.isBefore(cursor)) {
+      return const <tz.TZDateTime>[];
+    }
+
+    final scheduledDates = <tz.TZDateTime>[];
+
+    while (!cursor.isAfter(lastDate)) {
+      final scheduledDate = tz.TZDateTime(
+        tz.local,
+        cursor.year,
+        cursor.month,
+        cursor.day,
+        time.hour,
+        time.minute,
+      );
+
+      if (!scheduledDate.isBefore(now)) {
+        scheduledDates.add(scheduledDate);
+      }
+
+      cursor = cursor.add(const Duration(days: 1));
+    }
+
+    return scheduledDates;
+  }
+
+  static String _dateStamp(tz.TZDateTime value) {
+    return '${value.year.toString().padLeft(4, '0')}'
+        '${value.month.toString().padLeft(2, '0')}'
+        '${value.day.toString().padLeft(2, '0')}';
   }
 
   static DateTime? _parseStoredDate(dynamic value) {

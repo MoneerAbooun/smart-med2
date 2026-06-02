@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/features/auth/data/repositories/auth_repository.dart';
 import 'package:smart_med/features/auth/data/repositories/auth_user_flow_repository.dart';
 import 'package:smart_med/features/auth/presentation/pages/signup_page.dart';
+import 'package:smart_med/core/widgets/app_snack_bar.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -27,20 +29,10 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void showMessage(String message, {bool isError = true}) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(12),
-        duration: const Duration(seconds: 3),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
+    AppSnackBar.show(
+      context,
+      message,
+      type: isError ? AppSnackBarType.error : AppSnackBarType.success,
     );
   }
 
@@ -49,16 +41,17 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> validateLogin() async {
+    final l10n = context.l10n;
     final email = emailController.text.trim().toLowerCase();
     final password = passwordController.text.trim();
 
     if (email.isEmpty || password.isEmpty) {
-      showMessage("All fields must be filled");
+      showMessage(l10n.text('auth.validation.emailPasswordRequired'));
       return;
     }
 
     if (!_isValidEmail(email)) {
-      showMessage("Please enter a valid email");
+      showMessage(l10n.text('auth.validation.validEmail'));
       return;
     }
 
@@ -74,13 +67,17 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
 
-      showMessage("Login successful", isError: false);
+      showMessage(l10n.text('auth.signIn.success'), isError: false);
     } on FirebaseAuthException catch (e) {
-      showMessage(e.message ?? "Login failed");
-    } on AuthFlowException catch (e) {
-      showMessage(e.message);
+      if (e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        showMessage(l10n.text('auth.signIn.invalidCredentials'));
+      } else {
+        showMessage(l10n.text('auth.signIn.error'));
+      }
+    } on AuthFlowException {
+      showMessage(l10n.text('auth.signIn.error'));
     } catch (e) {
-      showMessage("Something went wrong");
+      showMessage(l10n.text('auth.signIn.unexpected'));
     } finally {
       if (mounted) {
         setState(() {
@@ -91,15 +88,16 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> sendResetPasswordEmail() async {
+    final l10n = context.l10n;
     final email = emailController.text.trim().toLowerCase();
 
     if (email.isEmpty) {
-      showMessage("Enter your email first");
+      showMessage(l10n.text('auth.validation.emailFirst'));
       return;
     }
 
     if (!_isValidEmail(email)) {
-      showMessage("Please enter a valid email");
+      showMessage(l10n.text('auth.validation.validEmail'));
       return;
     }
 
@@ -107,11 +105,11 @@ class _LoginPageState extends State<LoginPage> {
       await authRepository.resetPassword(email: email);
 
       if (!mounted) return;
-      showMessage("Password reset email sent", isError: false);
-    } on FirebaseAuthException catch (e) {
-      showMessage(e.message ?? "Failed to send reset email");
+      showMessage(l10n.text('auth.reset.sent'), isError: false);
+    } on FirebaseAuthException {
+      showMessage(l10n.text('auth.reset.error'));
     } catch (e) {
-      showMessage("Something went wrong");
+      showMessage(l10n.text('auth.reset.unexpected'));
     }
   }
 
@@ -137,17 +135,18 @@ class _LoginPageState extends State<LoginPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
 
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
           toolbarHeight: 70,
           centerTitle: true,
-          title: const Padding(
-            padding: EdgeInsets.only(top: 10),
+          title: Padding(
+            padding: const EdgeInsets.only(top: 10),
             child: Text(
-              "Smart Med",
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+              l10n.text('app.name'),
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
           ),
         ),
@@ -179,21 +178,21 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        "Welcome Back",
+                        l10n.text('auth.welcomeBack'),
                         style: textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "Login to continue using Smart Med",
+                        l10n.text('auth.signIn.subtitle'),
                         style: textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        "Email",
+                        l10n.text('auth.email'),
                         style: textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -204,13 +203,13 @@ class _LoginPageState extends State<LoginPage> {
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
                         decoration: buildInputDecoration(
-                          hintText: "Enter your email",
+                          hintText: l10n.text('auth.emailHint'),
                           prefixIcon: Icons.email_outlined,
                         ),
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        "Password",
+                        l10n.text('auth.password'),
                         style: textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
@@ -226,7 +225,7 @@ class _LoginPageState extends State<LoginPage> {
                           }
                         },
                         decoration: buildInputDecoration(
-                          hintText: "Enter your password",
+                          hintText: l10n.text('auth.passwordHint'),
                           prefixIcon: Icons.lock_outline,
                           suffixIcon: IconButton(
                             icon: Icon(
@@ -266,9 +265,9 @@ class _LoginPageState extends State<LoginPage> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text(
-                                  "Login",
-                                  style: TextStyle(
+                              : Text(
+                                  l10n.text('auth.signIn'),
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -284,7 +283,7 @@ class _LoginPageState extends State<LoginPage> {
                                   await sendResetPasswordEmail();
                                 },
                           child: Text(
-                            "Reset Password",
+                            l10n.text('auth.forgotPassword'),
                             style: TextStyle(
                               fontSize: 16,
                               color: colorScheme.primary,
@@ -305,7 +304,7 @@ class _LoginPageState extends State<LoginPage> {
                             );
                           },
                           child: Text(
-                            "Don't have an account? Sign Up",
+                            l10n.text('auth.createAccountPrompt'),
                             style: TextStyle(
                               fontSize: 16,
                               color: colorScheme.primary,

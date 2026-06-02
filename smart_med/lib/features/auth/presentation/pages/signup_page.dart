@@ -2,8 +2,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/features/auth/data/repositories/auth_user_flow_repository.dart';
+import 'package:smart_med/core/widgets/app_snack_bar.dart';
 
 class SignupPage extends StatefulWidget {
   const SignupPage({super.key});
@@ -17,10 +19,6 @@ class _SignupPageState extends State<SignupPage> {
   final TextEditingController ageController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController diseaseController = TextEditingController();
-  final TextEditingController newDiseaseController = TextEditingController();
-
-  final List<String> diseases = [];
   bool showPassword = false;
   bool isLoading = false;
 
@@ -30,80 +28,62 @@ class _SignupPageState extends State<SignupPage> {
     ageController.dispose();
     emailController.dispose();
     passwordController.dispose();
-    diseaseController.dispose();
-    newDiseaseController.dispose();
     super.dispose();
   }
 
-  void refreshVisibleDiseases() {
-    final visibleDiseases = diseases.length > 7
-        ? diseases.sublist(diseases.length - 7)
-        : diseases;
-    diseaseController.text = visibleDiseases.join('\n');
-  }
-
   void showMessage(String message, {bool isError = true}) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(12),
-        duration: const Duration(seconds: 3),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
+    AppSnackBar.show(
+      context,
+      message,
+      type: isError ? AppSnackBarType.error : AppSnackBarType.success,
     );
   }
 
   Future<void> validateSignup() async {
+    final l10n = context.l10n;
     final name = nameController.text.trim();
     final ageText = ageController.text.trim();
     final email = emailController.text.trim().toLowerCase();
     final password = passwordController.text.trim();
 
     if (name.isEmpty) {
-      showMessage("Please enter your name");
+      showMessage(l10n.text('auth.validation.nameRequired'));
       return;
     }
 
     if (ageText.isEmpty) {
-      showMessage("Please enter your age");
+      showMessage(l10n.text('auth.validation.ageRequired'));
       return;
     }
 
     final age = int.tryParse(ageText);
     if (age == null) {
-      showMessage("Age must be a valid number");
+      showMessage(l10n.text('auth.validation.ageNumber'));
       return;
     }
 
     if (age < 1 || age > 120) {
-      showMessage("Please enter a valid age");
+      showMessage(l10n.text('auth.validation.ageRange'));
       return;
     }
 
     if (email.isEmpty) {
-      showMessage("Please enter your email");
+      showMessage(l10n.text('auth.validation.emailRequired'));
       return;
     }
 
     if (!RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(email)) {
-      showMessage("Please enter a valid email address");
+      showMessage(l10n.text('auth.validation.validEmail'));
       return;
     }
 
     if (password.isEmpty) {
-      showMessage("Please enter your password");
+      showMessage(l10n.text('auth.validation.passwordRequired'));
       return;
     }
 
     if (password.length < 6) {
-      showMessage("Password must be at least 6 characters");
+      showMessage(l10n.text('auth.validation.passwordLength'));
       return;
     }
 
@@ -117,32 +97,31 @@ class _SignupPageState extends State<SignupPage> {
         password: password,
         username: name,
         age: age,
-        chronicDiseases: List<String>.from(diseases),
       );
 
       if (!mounted) return;
-      showMessage("Account created successfully", isError: false);
+      showMessage(l10n.text('auth.signup.success'), isError: false);
     } on FirebaseAuthException catch (e) {
       if (kDebugMode) {
         print(e.message);
       }
 
       if (!mounted) return;
-      showMessage(e.message ?? "There is an error");
+      showMessage(l10n.text('auth.signup.error'));
     } on AuthFlowException catch (e) {
       if (kDebugMode) {
         print(e.message);
       }
 
       if (!mounted) return;
-      showMessage(e.message);
+      showMessage(l10n.text('auth.signup.error'));
     } catch (e) {
       if (kDebugMode) {
         print(e);
       }
 
       if (!mounted) return;
-      showMessage("Something went wrong");
+      showMessage(l10n.text('auth.signup.unexpected'));
     } finally {
       if (mounted) {
         setState(() {
@@ -174,15 +153,16 @@ class _SignupPageState extends State<SignupPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
 
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
           centerTitle: true,
           elevation: 0,
-          title: const Text(
-            "Create Account",
-            style: TextStyle(fontWeight: FontWeight.bold),
+          title: Text(
+            l10n.text('auth.createAccount'),
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
         body: Center(
@@ -213,32 +193,32 @@ class _SignupPageState extends State<SignupPage> {
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        "Welcome to Smart Med",
+                        l10n.text('app.name'),
                         style: textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        "Create your account to continue",
+                        l10n.text('auth.signup.subtitle'),
                         style: textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const SizedBox(height: 24),
 
-                      _buildLabel(context, "Full Name *"),
+                      _buildLabel(context, l10n.text('auth.fullName')),
                       TextField(
                         controller: nameController,
                         textInputAction: TextInputAction.next,
                         decoration: buildInputDecoration(
-                          hintText: "Enter your full name",
+                          hintText: l10n.text('auth.fullNameHint'),
                           prefixIcon: Icons.person_outline,
                         ),
                       ),
                       const SizedBox(height: 24),
 
-                      _buildLabel(context, "Your Age *"),
+                      _buildLabel(context, l10n.text('auth.age')),
                       TextField(
                         controller: ageController,
                         keyboardType: TextInputType.number,
@@ -247,31 +227,31 @@ class _SignupPageState extends State<SignupPage> {
                           FilteringTextInputFormatter.digitsOnly,
                         ],
                         decoration: buildInputDecoration(
-                          hintText: "Enter your Age",
+                          hintText: l10n.text('auth.ageHint'),
                           prefixIcon: Icons.calendar_month_outlined,
                         ),
                       ),
                       const SizedBox(height: 18),
 
-                      _buildLabel(context, "Email *"),
+                      _buildLabel(context, l10n.text('auth.email')),
                       TextField(
                         controller: emailController,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
                         decoration: buildInputDecoration(
-                          hintText: "Enter your email",
+                          hintText: l10n.text('auth.emailHint'),
                           prefixIcon: Icons.email_outlined,
                         ),
                       ),
                       const SizedBox(height: 18),
 
-                      _buildLabel(context, "Password *"),
+                      _buildLabel(context, l10n.text('auth.password')),
                       TextField(
                         controller: passwordController,
                         obscureText: !showPassword,
                         textInputAction: TextInputAction.done,
                         decoration: buildInputDecoration(
-                          hintText: "Enter your password",
+                          hintText: l10n.text('auth.passwordCreateHint'),
                           prefixIcon: Icons.lock_outline,
                           suffixIcon: IconButton(
                             icon: Icon(
@@ -285,88 +265,6 @@ class _SignupPageState extends State<SignupPage> {
                               });
                             },
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      _buildLabel(context, "Chronic Diseases"),
-                      TextField(
-                        controller: newDiseaseController,
-                        decoration: buildInputDecoration(
-                          hintText: "Enter disease name",
-                          prefixIcon: Icons.medical_information_outlined,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () {
-                                if (newDiseaseController.text
-                                    .trim()
-                                    .isNotEmpty) {
-                                  setState(() {
-                                    diseases.add(
-                                      newDiseaseController.text.trim(),
-                                    );
-                                    refreshVisibleDiseases();
-                                    newDiseaseController.clear();
-                                  });
-                                } else {
-                                  showMessage("Please enter a disease first");
-                                }
-                              },
-                              icon: const Icon(Icons.add),
-                              label: const Text("Add Disease"),
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () {
-                                if (diseases.isEmpty) {
-                                  showMessage("No disease to remove");
-                                  return;
-                                }
-
-                                setState(() {
-                                  diseases.removeLast();
-                                  refreshVisibleDiseases();
-                                });
-                              },
-                              icon: const Icon(Icons.undo),
-                              label: const Text("Undo Last"),
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 14,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      TextField(
-                        controller: diseaseController,
-                        readOnly: true,
-                        maxLines: 4,
-                        decoration: buildInputDecoration(
-                          hintText: "Added diseases will appear here",
-                          prefixIcon: Icons.list_alt_outlined,
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -390,9 +288,9 @@ class _SignupPageState extends State<SignupPage> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text(
-                                  "Sign Up",
-                                  style: TextStyle(
+                              : Text(
+                                  l10n.text('auth.createAccount'),
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                   ),

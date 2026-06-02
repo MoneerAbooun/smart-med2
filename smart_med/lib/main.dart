@@ -12,8 +12,14 @@ Future<void> main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final bool isDark = prefs.getBool('isDark') ?? false;
+  final languageCode = prefs.getString('languageCode') ?? 'en';
 
   await NotificationService.init();
 
-  runApp(MainApp(initialThemeMode: isDark ? ThemeMode.dark : ThemeMode.light));
+  runApp(
+    MainApp(
+      initialThemeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+      initialLocale: Locale(languageCode),
+    ),
+  );
 }

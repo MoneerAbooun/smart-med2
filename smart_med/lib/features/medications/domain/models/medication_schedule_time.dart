@@ -1,4 +1,5 @@
 import 'package:smart_med/core/firebase/models/firestore_value_parser.dart';
+import 'package:smart_med/core/utils/localized_time_parser.dart';
 
 class MedicationScheduleTime {
   const MedicationScheduleTime({required this.hour, required this.minute});
@@ -16,39 +17,12 @@ class MedicationScheduleTime {
   }
 
   factory MedicationScheduleTime.fromDisplayString(String value) {
-    final normalized = value.trim().toUpperCase();
-    final meridiemMatch = RegExp(
-      r'^(\d{1,2}):(\d{2})\s?(AM|PM)$',
-    ).firstMatch(normalized);
+    final parsedTime = LocalizedTimeParser.parse(value);
 
-    if (meridiemMatch != null) {
-      int hour = int.parse(meridiemMatch.group(1)!);
-      final minute = int.parse(meridiemMatch.group(2)!);
-      final period = meridiemMatch.group(3)!;
-
-      if (period == 'PM' && hour != 12) {
-        hour += 12;
-      } else if (period == 'AM' && hour == 12) {
-        hour = 0;
-      }
-
-      return MedicationScheduleTime(hour: hour, minute: minute);
-    }
-
-    final twentyFourHourMatch = RegExp(
-      r'^(\d{1,2}):(\d{2})$',
-    ).firstMatch(normalized);
-
-    if (twentyFourHourMatch != null) {
-      final hour = int.parse(twentyFourHourMatch.group(1)!);
-      final minute = int.parse(twentyFourHourMatch.group(2)!);
-
-      if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60) {
-        return MedicationScheduleTime(hour: hour, minute: minute);
-      }
-    }
-
-    throw FormatException('Invalid time format: $value');
+    return MedicationScheduleTime(
+      hour: parsedTime.hour,
+      minute: parsedTime.minute,
+    );
   }
 
   static MedicationScheduleTime? tryFromDisplayString(String value) {

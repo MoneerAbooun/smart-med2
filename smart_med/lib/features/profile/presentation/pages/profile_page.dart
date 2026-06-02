@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/core/firebase/image_storage_repository.dart';
 import 'package:smart_med/features/auth/data/repositories/auth_repository.dart';
@@ -12,6 +13,7 @@ import 'package:smart_med/features/medications/presentation/pages/add_medication
 import 'package:smart_med/features/medications/presentation/pages/medication_list_page.dart';
 import 'package:smart_med/features/profile/data/repositories/profile_repository.dart';
 import 'package:smart_med/features/profile/domain/models/user_profile_record.dart';
+import 'package:smart_med/core/widgets/app_snack_bar.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -78,7 +80,7 @@ class _ProfilePageState extends State<ProfilePage> {
       final diseasesList = json.decode(diseasesString) as List<dynamic>;
       loadedDiseases = diseasesList.map((e) => e.toString()).toList();
     } catch (e) {
-      nextDiseaseLoadError = 'Unable to load the disease list';
+      nextDiseaseLoadError = 'profile.conditions.loadError';
       debugPrint('Error loading diseases: $e');
     }
 
@@ -91,7 +93,7 @@ class _ProfilePageState extends State<ProfilePage> {
           .map((e) => Map<String, String>.from(e))
           .toList();
     } catch (e) {
-      nextMedicineLoadError = 'Unable to load the medicine list';
+      nextMedicineLoadError = 'profile.allergies.loadError';
       debugPrint('Error loading medicines: $e');
     }
 
@@ -108,36 +110,40 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
-  String _diseaseHintText() {
+  String _diseaseHintText(BuildContext context) {
+    final l10n = context.l10n;
+
     if (!isEditing) {
-      return "Enable edit mode to add diseases";
+      return l10n.text('profile.conditions.hint.view');
     }
     if (isLoadingSelectorData) {
-      return "Loading diseases...";
+      return l10n.text('profile.conditions.hint.loading');
     }
     if (diseaseLoadError != null) {
-      return diseaseLoadError!;
+      return l10n.text(diseaseLoadError!);
     }
     if (availableDiseases.isEmpty) {
-      return "No diseases available";
+      return l10n.text('profile.conditions.hint.empty');
     }
-    return "Select a disease";
+    return l10n.text('profile.conditions.hint.select');
   }
 
-  String _allergyHintText() {
+  String _allergyHintText(BuildContext context) {
+    final l10n = context.l10n;
+
     if (!isEditing) {
-      return "Enable edit mode to add allergies";
+      return l10n.text('profile.allergies.hint.view');
     }
     if (isLoadingSelectorData) {
-      return "Loading medicines...";
+      return l10n.text('profile.allergies.hint.loading');
     }
     if (medicineLoadError != null) {
-      return medicineLoadError!;
+      return l10n.text(medicineLoadError!);
     }
     if (availableMedicines.isEmpty) {
-      return "No medicines available";
+      return l10n.text('profile.allergies.hint.empty');
     }
-    return "Select a medicine";
+    return l10n.text('profile.allergies.hint.select');
   }
 
   bool get _canSelectDiseaseOptions =>
@@ -275,8 +281,10 @@ class _ProfilePageState extends State<ProfilePage> {
         setState(() {
           isLoadingProfile = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_errorMessage(e, 'Failed to load profile'))),
+        AppSnackBar.show(
+          context,
+          _errorMessage(e, context.l10n.text('profile.loadError')),
+          type: AppSnackBarType.error,
         );
       }
     }
@@ -300,20 +308,13 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
-  void showMessage(String message) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, textAlign: TextAlign.center),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(12),
-      ),
-    );
+  void showMessage(String message, {AppSnackBarType? type}) {
+    AppSnackBar.show(context, message, type: type);
   }
 
   Future<void> _pickProfileImage() async {
     if (!isEditing) {
-      showMessage('Enable edit mode to change the profile image');
+      showMessage(context.l10n.text('profile.photo.editRequired'));
       return;
     }
 
@@ -346,7 +347,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     if (alreadyExists) {
-      showMessage('This disease is already added');
+      showMessage(context.l10n.text('profile.condition.duplicate'));
       return;
     }
 
@@ -372,7 +373,7 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     if (alreadyExists) {
-      showMessage('This allergy is already added');
+      showMessage(context.l10n.text('profile.allergy.duplicate'));
       return;
     }
 
@@ -391,13 +392,12 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> saveProfile() async {
-    final messenger = ScaffoldMessenger.of(context);
-
     try {
       FocusScope.of(context).unfocus();
+      final l10n = context.l10n;
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
-        showMessage('Please sign in again');
+        showMessage(l10n.text('profile.signInAgain'));
         return;
       }
 
@@ -405,42 +405,42 @@ class _ProfilePageState extends State<ProfilePage> {
       final ageText = ageController.text.trim();
 
       if (username.isEmpty) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text("Please enter your name"),
-            duration: Duration(seconds: 2),
-          ),
+        AppSnackBar.show(
+          context,
+          l10n.text('profile.validation.nameRequired'),
+          type: AppSnackBarType.warning,
+          duration: const Duration(seconds: 2),
         );
         return;
       }
 
       if (ageText.isEmpty) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text("Please enter your age"),
-            duration: Duration(seconds: 2),
-          ),
+        AppSnackBar.show(
+          context,
+          l10n.text('profile.validation.ageRequired'),
+          type: AppSnackBarType.warning,
+          duration: const Duration(seconds: 2),
         );
         return;
       }
 
       final age = int.tryParse(ageText);
       if (age == null) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text("Age must be a valid number"),
-            duration: Duration(seconds: 2),
-          ),
+        AppSnackBar.show(
+          context,
+          l10n.text('profile.validation.ageNumber'),
+          type: AppSnackBarType.warning,
+          duration: const Duration(seconds: 2),
         );
         return;
       }
 
       if (age < 1 || age > 120) {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text("Please enter a valid age"),
-            duration: Duration(seconds: 2),
-          ),
+        AppSnackBar.show(
+          context,
+          l10n.text('profile.validation.ageRange'),
+          type: AppSnackBarType.warning,
+          duration: const Duration(seconds: 2),
         );
         return;
       }
@@ -491,20 +491,20 @@ class _ProfilePageState extends State<ProfilePage> {
 
       if (!mounted) return;
 
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text("Profile data saved successfully"),
-          duration: Duration(seconds: 2),
-        ),
+      AppSnackBar.show(
+        context,
+        l10n.text('profile.saved'),
+        type: AppSnackBarType.success,
+        duration: const Duration(seconds: 2),
       );
     } catch (e) {
       if (!mounted) return;
 
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(_errorMessage(e, "Failed to save profile data")),
-          duration: Duration(seconds: 2),
-        ),
+      AppSnackBar.show(
+        context,
+        _errorMessage(e, context.l10n.text('profile.saveError')),
+        type: AppSnackBarType.error,
+        duration: const Duration(seconds: 2),
       );
     } finally {
       if (mounted) {
@@ -604,6 +604,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget buildChronicDiseasesSection(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -618,16 +619,15 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           buildSectionHeading(
             icon: Icons.medical_information_outlined,
-            title: "Chronic diseases",
-            subtitle:
-                "Track long-term conditions that can affect medication safety.",
+            title: l10n.text('profile.conditions.title'),
+            subtitle: l10n.text('profile.conditions.subtitle'),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: selectedDisease,
             isExpanded: true,
             decoration: InputDecoration(
-              hintText: _diseaseHintText(),
+              hintText: _diseaseHintText(context),
               prefixIcon: const Icon(Icons.medical_information_outlined),
             ),
             items: _canSelectDiseaseOptions
@@ -635,7 +635,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     return DropdownMenuItem<String>(
                       value: disease,
                       child: Text(
-                        disease,
+                        l10n.isolate(disease),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -653,11 +653,11 @@ class _ProfilePageState extends State<ProfilePage> {
           if (isEditing && diseaseLoadError != null) ...[
             const SizedBox(height: 8),
             Align(
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               child: TextButton.icon(
                 onPressed: _retrySelectorDataLoad,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry loading diseases'),
+                label: Text(l10n.text('profile.conditions.retry')),
               ),
             ),
           ],
@@ -666,7 +666,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ElevatedButton.icon(
               onPressed: addDisease,
               icon: const Icon(Icons.add),
-              label: const Text("Add Disease"),
+              label: Text(l10n.text('profile.conditions.add')),
             ),
           const SizedBox(height: 12),
           Container(
@@ -680,9 +680,9 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             child: chronicDiseases.isEmpty
                 ? Align(
-                    alignment: Alignment.centerLeft,
+                    alignment: AlignmentDirectional.centerStart,
                     child: Text(
-                      "No chronic diseases added",
+                      l10n.text('profile.conditions.none'),
                       style: TextStyle(color: colorScheme.onSurfaceVariant),
                     ),
                   )
@@ -693,7 +693,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       final disease = chronicDiseases[index];
 
                       return Chip(
-                        label: Text(disease),
+                        label: Text(l10n.isolate(disease)),
                         deleteIcon: isEditing
                             ? const Icon(Icons.close, size: 18)
                             : null,
@@ -711,6 +711,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget buildDrugAllergiesSection(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -725,16 +726,15 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           buildSectionHeading(
             icon: Icons.warning_amber_rounded,
-            title: "Drug allergies",
-            subtitle:
-                "Add medicines that may cause an allergic reaction for this patient.",
+            title: l10n.text('profile.allergies.title'),
+            subtitle: l10n.text('profile.allergies.subtitle'),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: selectedAllergy,
             isExpanded: true,
             decoration: InputDecoration(
-              hintText: _allergyHintText(),
+              hintText: _allergyHintText(context),
               prefixIcon: const Icon(Icons.warning_amber_rounded),
             ),
             items: _canSelectMedicineOptions
@@ -747,7 +747,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     return DropdownMenuItem<String>(
                       value: brandName,
                       child: Text(
-                        displayText,
+                        l10n.isolate(displayText),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -765,11 +765,11 @@ class _ProfilePageState extends State<ProfilePage> {
           if (isEditing && medicineLoadError != null) ...[
             const SizedBox(height: 8),
             Align(
-              alignment: Alignment.centerLeft,
+              alignment: AlignmentDirectional.centerStart,
               child: TextButton.icon(
                 onPressed: _retrySelectorDataLoad,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry loading medicines'),
+                label: Text(l10n.text('profile.allergies.retry')),
               ),
             ),
           ],
@@ -778,7 +778,7 @@ class _ProfilePageState extends State<ProfilePage> {
             ElevatedButton.icon(
               onPressed: addAllergy,
               icon: const Icon(Icons.add),
-              label: const Text("Add Allergy"),
+              label: Text(l10n.text('profile.allergies.add')),
             ),
           const SizedBox(height: 12),
           Container(
@@ -792,9 +792,9 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             child: drugAllergies.isEmpty
                 ? Align(
-                    alignment: Alignment.centerLeft,
+                    alignment: AlignmentDirectional.centerStart,
                     child: Text(
-                      "No drug allergies added",
+                      l10n.text('profile.allergies.none'),
                       style: TextStyle(color: colorScheme.onSurfaceVariant),
                     ),
                   )
@@ -805,7 +805,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       final allergy = drugAllergies[index];
 
                       return Chip(
-                        label: Text(allergy),
+                        label: Text(l10n.isolate(allergy)),
                         deleteIcon: isEditing
                             ? const Icon(Icons.close, size: 18)
                             : null,
@@ -824,6 +824,7 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget buildMedicalInfoCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -838,20 +839,25 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           buildSectionHeading(
             icon: Icons.monitor_heart_outlined,
-            title: "Patient Medical Info",
-            subtitle:
-                "These details help later in calculating a safer medication dose.",
+            title: l10n.text('profile.health.title'),
+            subtitle: l10n.text('profile.health.subtitle'),
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
             initialValue: biologicalSex,
             decoration: buildMedicalFieldDecoration(
-              "Biological Sex",
+              l10n.text('profile.health.biologicalSex'),
               Icons.wc_outlined,
             ),
-            items: const [
-              DropdownMenuItem(value: 'male', child: Text('Male')),
-              DropdownMenuItem(value: 'female', child: Text('Female')),
+            items: [
+              DropdownMenuItem(
+                value: 'male',
+                child: Text(l10n.text('profile.health.male')),
+              ),
+              DropdownMenuItem(
+                value: 'female',
+                child: Text(l10n.text('profile.health.female')),
+              ),
             ],
             onChanged: !isEditing
                 ? null
@@ -874,7 +880,7 @@ class _ProfilePageState extends State<ProfilePage> {
               Expanded(
                 child: buildMedicalNumberField(
                   controller: weightController,
-                  label: "Weight (kg)",
+                  label: l10n.text('profile.health.weight'),
                   icon: Icons.monitor_weight_outlined,
                 ),
               ),
@@ -882,7 +888,7 @@ class _ProfilePageState extends State<ProfilePage> {
               Expanded(
                 child: buildMedicalNumberField(
                   controller: heightController,
-                  label: "Height (cm)",
+                  label: l10n.text('profile.health.height'),
                   icon: Icons.height_outlined,
                 ),
               ),
@@ -893,14 +899,14 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: 12),
 
           Text(
-            "Blood Pressure",
+            l10n.text('profile.health.bloodPressure'),
             style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 6),
 
           Text(
-            "SYS = upper number, DIA = lower number",
+            l10n.text('profile.health.bloodPressureHelp'),
             softWrap: true,
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
@@ -911,7 +917,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
           buildMedicalNumberField(
             controller: systolicPressureController,
-            label: "SYS / Upper",
+            label: l10n.text('profile.health.systolic'),
             icon: Icons.favorite_border,
             allowDecimal: false,
           ),
@@ -920,7 +926,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
           buildMedicalNumberField(
             controller: diastolicPressureController,
-            label: "DIA / Lower",
+            label: l10n.text('profile.health.diastolic'),
             icon: Icons.favorite,
             allowDecimal: false,
           ),
@@ -928,20 +934,20 @@ class _ProfilePageState extends State<ProfilePage> {
           const SizedBox(height: 12),
 
           Text(
-            "Blood Glucose",
+            l10n.text('profile.health.bloodGlucose'),
             style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
 
           const SizedBox(height: 12),
           buildMedicalNumberField(
             controller: bloodGlucoseController,
-            label: "Blood Glucose",
+            label: l10n.text('profile.health.bloodGlucose'),
             icon: Icons.bloodtype_outlined,
           ),
           if (biologicalSex == 'female') ...[
             const SizedBox(height: 8),
             buildSwitchTile(
-              title: "Pregnant",
+              title: l10n.text('profile.health.pregnant'),
               value: isPregnant,
               onChanged: !isEditing
                   ? null
@@ -952,7 +958,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     },
             ),
             buildSwitchTile(
-              title: "Breastfeeding",
+              title: l10n.text('profile.health.breastfeeding'),
               value: isBreastfeeding,
               onChanged: !isEditing
                   ? null
@@ -972,20 +978,20 @@ class _ProfilePageState extends State<ProfilePage> {
     final missingFields = <String>[];
 
     if (ageController.text.trim().isEmpty) {
-      missingFields.add('Age');
+      missingFields.add('profile.readiness.age');
     }
     if (drugAllergies.isEmpty) {
-      missingFields.add('Allergies');
+      missingFields.add('profile.readiness.allergies');
     }
     if (chronicDiseases.isEmpty) {
-      missingFields.add('Conditions');
+      missingFields.add('profile.readiness.conditions');
     }
     if (weightController.text.trim().isEmpty) {
-      missingFields.add('Weight');
+      missingFields.add('profile.readiness.weight');
     }
     if (systolicPressureController.text.trim().isEmpty ||
         diastolicPressureController.text.trim().isEmpty) {
-      missingFields.add('Blood Pressure');
+      missingFields.add('profile.readiness.bloodPressure');
     }
     return missingFields;
   }
@@ -1014,14 +1020,15 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Widget buildSafetyReadinessCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     final missingFields = _missingSafetyReadinessFields();
     final labels = <String>[
-      'Age',
-      'Allergies',
-      'Conditions',
-      'Weight',
-      'Blood Pressure',
-      if (biologicalSex == 'female') 'Pregnancy Status',
+      'profile.readiness.age',
+      'profile.readiness.allergies',
+      'profile.readiness.conditions',
+      'profile.readiness.weight',
+      'profile.readiness.bloodPressure',
+      if (biologicalSex == 'female') 'profile.readiness.pregnancyStatus',
     ];
 
     return Container(
@@ -1037,10 +1044,10 @@ class _ProfilePageState extends State<ProfilePage> {
         children: [
           buildSectionHeading(
             icon: Icons.verified_user_outlined,
-            title: 'Safety Profile Readiness',
+            title: l10n.text('profile.readiness.title'),
             subtitle: missingFields.isEmpty
-                ? 'Your profile is complete enough to support stronger medication warnings.'
-                : 'Missing profile details may reduce warning accuracy. Smart Med uses this profile to personalize medication cautions and safer-use advice.',
+                ? l10n.text('profile.readiness.complete')
+                : l10n.text('profile.readiness.incomplete'),
           ),
           const SizedBox(height: 14),
           Wrap(
@@ -1048,10 +1055,10 @@ class _ProfilePageState extends State<ProfilePage> {
             runSpacing: 8,
             children: labels
                 .map(
-                  (label) => _buildReadinessChip(
+                  (labelKey) => _buildReadinessChip(
                     context,
-                    label,
-                    missingFields.contains(label),
+                    l10n.text(labelKey),
+                    missingFields.contains(labelKey),
                   ),
                 )
                 .toList(growable: false),
@@ -1064,25 +1071,26 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     final profileImageProvider = _currentProfileImageProvider();
 
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
           toolbarHeight: 70,
-          title: const Padding(
-            padding: EdgeInsets.only(top: 10),
+          title: Padding(
+            padding: const EdgeInsets.only(top: 10),
             child: Text(
-              "Profile",
-              style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+              l10n.text('profile.title'),
+              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
             ),
           ),
           actions: [
             Padding(
-              padding: const EdgeInsets.only(top: 10, right: 8),
+              padding: const EdgeInsetsDirectional.only(top: 10, end: 8),
               child: IconButton(
                 icon: const Icon(Icons.medication_outlined, size: 28),
-                tooltip: 'Medications',
+                tooltip: l10n.text('common.medications'),
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -1144,8 +1152,12 @@ class _ProfilePageState extends State<ProfilePage> {
                                             ),
                                             label: Text(
                                               (profileImageProvider != null)
-                                                  ? 'Change photo'
-                                                  : 'Add photo',
+                                                  ? l10n.text(
+                                                      'profile.photo.change',
+                                                    )
+                                                  : l10n.text(
+                                                      'profile.photo.add',
+                                                    ),
                                             ),
                                           ),
                                         ],
@@ -1162,8 +1174,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                             TextField(
                                               controller: nameController,
                                               readOnly: !isEditing,
-                                              decoration: const InputDecoration(
-                                                hintText: "User Name",
+                                              decoration: InputDecoration(
+                                                hintText: l10n.text(
+                                                  'profile.yourName',
+                                                ),
                                                 border: InputBorder.none,
                                                 isDense: true,
                                                 contentPadding:
@@ -1183,7 +1197,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                             Row(
                                               children: [
                                                 Text(
-                                                  "Age: ",
+                                                  l10n.text('profile.ageLabel'),
                                                   style: TextStyle(
                                                     fontSize: 18,
                                                     fontWeight: FontWeight.w600,
@@ -1261,7 +1275,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                       );
                                     },
                                     icon: const Icon(Icons.add),
-                                    label: const Text("Add Medication"),
+                                    label: Text(
+                                      l10n.text('common.addMedicine'),
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 25),
@@ -1289,7 +1305,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                               strokeWidth: 2.2,
                                             ),
                                           )
-                                        : const Text("Save"),
+                                        : Text(
+                                            l10n.text('profile.saveProfile'),
+                                          ),
                                   ),
                                 ),
                               ],

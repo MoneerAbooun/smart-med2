@@ -2,12 +2,14 @@
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/core/services/notification_service.dart';
 import 'package:smart_med/features/medications/data/repositories/medication_repository.dart';
 import 'package:smart_med/features/medications/domain/models/medication_record.dart';
 import 'package:smart_med/features/medications/presentation/pages/add_medication_page.dart';
 import 'package:smart_med/features/medications/presentation/pages/edit_medication_page.dart';
+import 'package:smart_med/core/widgets/app_snack_bar.dart';
 
 class MedicationListPage extends StatefulWidget {
   const MedicationListPage({super.key});
@@ -27,8 +29,10 @@ class _MedicationListPageState extends State<MedicationListPage> {
     final medicationId = medication.id;
 
     if (user == null || medicationId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to delete this medication')),
+      AppSnackBar.show(
+        context,
+        context.l10n.text('medication.deleteError'),
+        type: AppSnackBarType.error,
       );
       return;
     }
@@ -42,21 +46,23 @@ class _MedicationListPageState extends State<MedicationListPage> {
 
       if (!context.mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Medication deleted successfully')),
+      AppSnackBar.show(
+        context,
+        context.l10n.text('medication.deleted'),
+        type: AppSnackBarType.success,
       );
     } on FirebaseException catch (e) {
       if (!context.mounted) return;
 
-      ScaffoldMessenger.of(
+      AppSnackBar.show(
         context,
-      ).showSnackBar(SnackBar(content: Text(e.message ?? 'Delete failed')));
+        e.message ?? context.l10n.text('medication.deleteError'),
+        type: AppSnackBarType.error,
+      );
     } catch (e) {
       if (!context.mounted) return;
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.toString())));
+      AppSnackBar.show(context, e.toString(), type: AppSnackBarType.error);
     }
   }
 
@@ -67,17 +73,22 @@ class _MedicationListPageState extends State<MedicationListPage> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) {
+        final l10n = context.l10n;
         return AlertDialog(
-          title: const Text('Delete Medication'),
-          content: Text('Are you sure you want to delete ${medication.name}?'),
+          title: Text(l10n.text('medication.deleteTitle')),
+          content: Text(
+            l10n.format('medication.deleteBody', <String, String>{
+              'medicine': l10n.isolate(medication.name),
+            }),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(l10n.text('common.cancel')),
             ),
             TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete'),
+              child: Text(l10n.text('common.delete')),
             ),
           ],
         );
@@ -98,6 +109,8 @@ class _MedicationListPageState extends State<MedicationListPage> {
   }
 
   Widget buildMedicationInfo(BuildContext context, String title, String value) {
+    final l10n = context.l10n;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: RichText(
@@ -111,7 +124,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
               text: '$title: ',
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            TextSpan(text: value),
+            TextSpan(text: l10n.isolate(value)),
           ],
         ),
       ),
@@ -159,14 +172,15 @@ class _MedicationListPageState extends State<MedicationListPage> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
+    final l10n = context.l10n;
 
     if (user == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('My Active Medications'),
+          title: Text(l10n.text('medication.list.title')),
           centerTitle: true,
         ),
-        body: const Center(child: Text('No logged in user found')),
+        body: Center(child: Text(l10n.text('medication.signIn.view'))),
       );
     }
 
@@ -176,7 +190,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Active Medications'),
+        title: Text(l10n.text('medication.list.title')),
         centerTitle: true,
       ),
       body: StreamBuilder<List<MedicationRecord>>(
@@ -188,7 +202,11 @@ class _MedicationListPageState extends State<MedicationListPage> {
 
           if (snapshot.hasError) {
             return Center(
-              child: Text('Something went wrong: ${snapshot.error}'),
+              child: Text(
+                l10n.format('medication.loadError', <String, String>{
+                  'error': l10n.isolate(snapshot.error.toString()),
+                }),
+              ),
             );
           }
 
@@ -206,16 +224,16 @@ class _MedicationListPageState extends State<MedicationListPage> {
                       borderRadius: 24,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'No active medications added yet',
-                      style: TextStyle(
+                    Text(
+                      l10n.text('medication.empty.title'),
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      'Tap the button below to add your first medication.',
+                    Text(
+                      l10n.text('medication.empty.body'),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
@@ -229,7 +247,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
                         );
                       },
                       icon: const Icon(Icons.add),
-                      label: const Text('Add Medication'),
+                      label: Text(l10n.text('common.addMedicine')),
                     ),
                   ],
                 ),
@@ -246,6 +264,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
             itemBuilder: (context, index) {
               final medication = medications[index];
               final startDate = _formatDate(medication.startDate);
+              final finishDate = _formatDate(medication.endDate);
 
               return Card(
                 elevation: 2,
@@ -264,7 +283,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              medication.name,
+                              l10n.isolate(medication.name),
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -296,27 +315,37 @@ class _MedicationListPageState extends State<MedicationListPage> {
                       if (medication.dosage.isNotEmpty)
                         buildMedicationInfo(
                           context,
-                          'Dosage',
+                          l10n.text('medication.info.dose'),
                           medication.dosage,
                         ),
                       if (medication.frequency.isNotEmpty)
                         buildMedicationInfo(
                           context,
-                          'Frequency',
+                          l10n.text('medication.info.howOften'),
                           medication.frequency,
                         ),
                       if (medication.reminderTimes.isNotEmpty)
                         buildMedicationInfo(
                           context,
-                          'Reminder times',
+                          l10n.text('medication.info.reminderTimes'),
                           medication.reminderTimes.join(', '),
                         ),
                       if (startDate.isNotEmpty)
-                        buildMedicationInfo(context, 'Start Date', startDate),
+                        buildMedicationInfo(
+                          context,
+                          l10n.text('medication.info.startDate'),
+                          startDate,
+                        ),
+                      if (finishDate.isNotEmpty)
+                        buildMedicationInfo(
+                          context,
+                          l10n.text('medication.info.finishDate'),
+                          finishDate,
+                        ),
                       if ((medication.notes ?? '').isNotEmpty)
                         buildMedicationInfo(
                           context,
-                          'Notes',
+                          l10n.text('medication.info.notes'),
                           medication.notes!,
                         ),
                     ],
@@ -335,7 +364,7 @@ class _MedicationListPageState extends State<MedicationListPage> {
           );
         },
         icon: const Icon(Icons.add),
-        label: const Text('Add'),
+        label: Text(l10n.text('common.addMedicine')),
       ),
     );
   }

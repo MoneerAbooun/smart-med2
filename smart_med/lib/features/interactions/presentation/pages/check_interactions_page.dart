@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
+import 'package:smart_med/data/medicine/medicine_name_entry.dart';
+import 'package:smart_med/data/medicine/medicine_name_repository.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/features/interactions/data/drug_interaction_lookup_repository.dart';
 import 'package:smart_med/features/interactions/data/drug_interaction_repository.dart';
@@ -10,6 +13,8 @@ import 'package:smart_med/features/interactions/data/models/drug_interaction_rec
 import 'package:smart_med/features/interactions/data/models/interaction_history_record.dart';
 import 'package:smart_med/features/interactions/domain/models/drug_interaction_lookup_result.dart';
 import 'package:smart_med/features/interactions/presentation/widgets/interaction_severity_chip.dart';
+import 'package:smart_med/features/medicine_search/data/repositories/medicine_search_history_repository.dart';
+import 'package:smart_med/features/medicine_search/presentation/widgets/medicine_name_suggestion_helpers.dart';
 
 class CheckInteractionsPage extends StatefulWidget {
   const CheckInteractionsPage({super.key});
@@ -22,21 +27,45 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _firstDrugController = TextEditingController();
   final TextEditingController _secondDrugController = TextEditingController();
+  final FocusNode _firstDrugFocusNode = FocusNode();
+  final FocusNode _secondDrugFocusNode = FocusNode();
   final DrugInteractionLookupRepository _lookupRepository =
       drugInteractionLookupRepository;
   final DrugInteractionRepository _drugInteractionRepository =
       drugInteractionRepository;
   final InteractionHistoryRepository _interactionHistoryRepository =
       interactionHistoryRepository;
+  final MedicineSearchHistoryRepository _medicineSearchHistoryRepository =
+      medicineSearchHistoryRepository;
+  final MedicineNameRepository _medicineNameRepository = medicineNameRepository;
 
   bool _isChecking = false;
   String? _errorMessage;
   DrugInteractionLookupResult? _result;
+  List<String> _recentMedicineSearches = const <String>[];
+  List<MedicineNameEntry> _medicineNameEntries = const <MedicineNameEntry>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _firstDrugController.addListener(_onInteractionInputChanged);
+    _secondDrugController.addListener(_onInteractionInputChanged);
+    _firstDrugFocusNode.addListener(_onInteractionInputChanged);
+    _secondDrugFocusNode.addListener(_onInteractionInputChanged);
+    _loadSearchHistory();
+    _loadMedicineNameEntries();
+  }
 
   @override
   void dispose() {
+    _firstDrugController.removeListener(_onInteractionInputChanged);
+    _secondDrugController.removeListener(_onInteractionInputChanged);
+    _firstDrugFocusNode.removeListener(_onInteractionInputChanged);
+    _secondDrugFocusNode.removeListener(_onInteractionInputChanged);
     _firstDrugController.dispose();
     _secondDrugController.dispose();
+    _firstDrugFocusNode.dispose();
+    _secondDrugFocusNode.dispose();
     super.dispose();
   }
 
@@ -55,10 +84,100 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
     );
   }
 
-  void _applyExample(String firstDrug, String secondDrug) {
+  Future<void> _loadSearchHistory() async {
+    final history = await _medicineSearchHistoryRepository.loadHistory();
+
+    if (!mounted) return;
+
     setState(() {
-      _firstDrugController.text = firstDrug;
-      _secondDrugController.text = secondDrug;
+      _recentMedicineSearches = history;
+    });
+  }
+
+  void _onInteractionInputChanged() {
+    if (!mounted) return;
+
+    setState(() {});
+  }
+
+  Future<void> _loadMedicineNameEntries() async {
+    try {
+      final entries = await _medicineNameRepository.loadEntries();
+
+      if (!mounted) return;
+
+      setState(() {
+        _medicineNameEntries = entries;
+      });
+    } catch (_) {
+      // Suggestions are a helper only. Checking still works if the local list fails.
+    }
+  }
+
+  TextEditingController? get _activeDrugController {
+    if (_secondDrugFocusNode.hasFocus) {
+      return _secondDrugController;
+    }
+
+    if (_firstDrugFocusNode.hasFocus) {
+      return _firstDrugController;
+    }
+
+    return null;
+  }
+
+  List<MedicineNameEntry> _filteredMedicineSuggestions() {
+    final controller = _activeDrugController;
+    if (controller == null) {
+      return const <MedicineNameEntry>[];
+    }
+
+    return filterMedicineNameSuggestions(_medicineNameEntries, controller.text);
+  }
+
+  void _applyMedicineSuggestion(MedicineNameEntry entry) {
+    final value = medicineEntrySearchValue(entry);
+    final controller =
+        _activeDrugController ??
+        (_firstDrugController.text.trim().isEmpty
+            ? _firstDrugController
+            : _secondDrugController);
+
+    setState(() {
+      controller.text = value;
+      controller.selection = TextSelection.collapsed(offset: value.length);
+      _errorMessage = null;
+    });
+  }
+
+  Future<void> _saveMedicineSearches(Iterable<String> values) async {
+    var history = _recentMedicineSearches;
+
+    for (final value in values) {
+      history = await _medicineSearchHistoryRepository.saveSearch(value);
+    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _recentMedicineSearches = history;
+    });
+  }
+
+  void _applyRecentMedicine(String medicine) {
+    setState(() {
+      final firstText = _firstDrugController.text.trim();
+      final secondText = _secondDrugController.text.trim();
+
+      if (firstText.isEmpty) {
+        _firstDrugController.text = medicine;
+      } else if (secondText.isEmpty &&
+          firstText.toLowerCase() != medicine.toLowerCase()) {
+        _secondDrugController.text = medicine;
+      } else {
+        _firstDrugController.text = medicine;
+      }
+
       _errorMessage = null;
     });
   }
@@ -66,13 +185,13 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
   String? _validateDrugName(String? value, {String? otherValue}) {
     final normalized = value?.trim() ?? '';
     if (normalized.isEmpty) {
-      return 'Please enter a medicine name';
+      return context.l10n.text('interactions.validation.enterName');
     }
 
     final otherNormalized = otherValue?.trim() ?? '';
     if (otherNormalized.isNotEmpty &&
         normalized.toLowerCase() == otherNormalized.toLowerCase()) {
-      return 'Please enter two different medicines';
+      return context.l10n.text('interactions.validation.different');
     }
 
     return null;
@@ -109,6 +228,12 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
       });
 
       unawaited(_persistResult(result));
+      unawaited(
+        _saveMedicineSearches(<String>[
+          result.firstEnteredName,
+          result.secondEnteredName,
+        ]),
+      );
     } on DrugInteractionLookupRepositoryException catch (error) {
       if (!mounted) {
         return;
@@ -177,7 +302,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
     if (normalized.contains('rxnorm') &&
         normalized.contains('openfda') &&
         normalized.contains('dailymed')) {
-      return 'Grounded with RxNorm, OpenFDA, and DailyMed public data.';
+      return context.l10n.text('interactions.source.public');
     }
 
     return source;
@@ -185,6 +310,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
 
   Widget _buildIntroCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -205,14 +331,14 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
           ),
           const SizedBox(height: 14),
           Text(
-            'Check drug interactions with live backend data',
+            l10n.text('interactions.intro.title'),
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Enter any two medicine names to review interaction severity, warnings, and safer-use recommendations.',
+            l10n.text('interactions.intro.subtitle'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -222,25 +348,57 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
     );
   }
 
-  Widget _buildExampleChips() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
+  Widget _buildSearchHistoryChips() {
+    if (_recentMedicineSearches.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ActionChip(
-          label: const Text('Warfarin + Ibuprofen'),
-          onPressed: () => _applyExample('warfarin', 'ibuprofen'),
+        Text(
+          context.l10n.text('common.recentSearches'),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
         ),
-        ActionChip(
-          label: const Text('Sildenafil + Nitroglycerin'),
-          onPressed: () => _applyExample('sildenafil', 'nitroglycerin'),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _recentMedicineSearches
+              .map((medicine) {
+                return ActionChip(
+                  label: Text(context.l10n.isolate(medicine)),
+                  avatar: const Icon(Icons.history, size: 18),
+                  onPressed: _isChecking
+                      ? null
+                      : () => _applyRecentMedicine(medicine),
+                );
+              })
+              .toList(growable: false),
         ),
       ],
     );
   }
 
+  Widget _buildMedicineSuggestionsOrHistory() {
+    final activeController = _activeDrugController;
+
+    if (activeController != null && activeController.text.trim().isNotEmpty) {
+      return MedicineNameSuggestionsList(
+        suggestions: _filteredMedicineSuggestions(),
+        onSelected: _applyMedicineSuggestion,
+        disabled: _isChecking,
+      );
+    }
+
+    return _buildSearchHistoryChips();
+  }
+
   Widget _buildFormCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -264,14 +422,14 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Medicines to compare',
+              l10n.text('interactions.form.title'),
               style: Theme.of(
                 context,
               ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              'You can type a brand or generic name.',
+              l10n.text('interactions.form.subtitle'),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -279,11 +437,12 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _firstDrugController,
+              focusNode: _firstDrugFocusNode,
               textInputAction: TextInputAction.next,
               decoration: _inputDecoration(
                 context,
-                label: 'First medicine',
-                hint: 'Example: warfarin',
+                label: l10n.text('interactions.firstMedicine'),
+                hint: 'warfarin',
               ),
               validator: (value) => _validateDrugName(
                 value,
@@ -293,11 +452,12 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
             const SizedBox(height: 14),
             TextFormField(
               controller: _secondDrugController,
+              focusNode: _secondDrugFocusNode,
               textInputAction: TextInputAction.done,
               decoration: _inputDecoration(
                 context,
-                label: 'Second medicine',
-                hint: 'Example: ibuprofen',
+                label: l10n.text('interactions.secondMedicine'),
+                hint: l10n.text('common.exampleIbuprofen'),
               ),
               validator: (value) => _validateDrugName(
                 value,
@@ -310,7 +470,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
               },
             ),
             const SizedBox(height: 14),
-            _buildExampleChips(),
+            _buildMedicineSuggestionsOrHistory(),
             const SizedBox(height: 18),
             SizedBox(
               width: double.infinity,
@@ -324,7 +484,9 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
                       )
                     : const Icon(Icons.search),
                 label: Text(
-                  _isChecking ? 'Checking interaction...' : 'Check Interaction',
+                  _isChecking
+                      ? l10n.text('common.checking')
+                      : l10n.text('interactions.checkButton'),
                 ),
               ),
             ),
@@ -464,6 +626,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
     String? localGenericName,
     String? apiGenericName,
   }) {
+    final l10n = context.l10n;
     final lines = <String>[];
     final localParts = <String>[];
     final brandName = _cleanText(localBrandName);
@@ -472,23 +635,39 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
     final apiGeneric = _cleanText(apiGenericName);
 
     if (brandName != null) {
-      localParts.add('brand: $brandName');
+      localParts.add(
+        '${l10n.text('common.brand')}: ${l10n.isolate(brandName)}',
+      );
     }
     if (localGeneric != null) {
-      localParts.add('generic: $localGeneric');
+      localParts.add(
+        '${l10n.text('common.generic')}: ${l10n.isolate(localGeneric)}',
+      );
     }
     if (localParts.isNotEmpty) {
-      lines.add('Local match: ${localParts.join(', ')}');
+      lines.add(
+        l10n.format('interactions.result.matchedAppList', <String, String>{
+          'details': localParts.join(', '),
+        }),
+      );
     }
 
     if (checkedName != null && !_sameText(checkedName, enteredName)) {
-      lines.add('Checked as: $checkedName');
+      lines.add(
+        l10n.format('interactions.result.checkedAs', <String, String>{
+          'name': l10n.isolate(checkedName),
+        }),
+      );
     }
 
     if (apiGeneric != null &&
         !_sameText(apiGeneric, localGeneric) &&
         !_sameText(apiGeneric, checkedName)) {
-      lines.add('API generic: $apiGeneric');
+      lines.add(
+        l10n.format('interactions.result.publicGeneric', <String, String>{
+          'name': l10n.isolate(apiGeneric),
+        }),
+      );
     }
 
     return lines;
@@ -501,6 +680,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
     required List<String> detailLines,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Padding(
       padding: const EdgeInsets.only(top: 10),
@@ -514,7 +694,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$label: $enteredName',
+                  '$label: ${l10n.isolate(enteredName)}',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -542,8 +722,12 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
     BuildContext context,
     DrugInteractionLookupResult result,
   ) {
-    final firstEnteredName = _cleanText(result.firstEnteredName) ?? 'First';
-    final secondEnteredName = _cleanText(result.secondEnteredName) ?? 'Second';
+    final firstEnteredName =
+        _cleanText(result.firstEnteredName) ??
+        context.l10n.text('interactions.result.first');
+    final secondEnteredName =
+        _cleanText(result.secondEnteredName) ??
+        context.l10n.text('interactions.result.second');
     final firstDetails = _medicineDetailLines(
       enteredName: firstEnteredName,
       checkedQuery: result.firstQuery,
@@ -569,20 +753,20 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Resolved medicine names',
+            context.l10n.text('interactions.result.medicineNamesChecked'),
             style: Theme.of(
               context,
             ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           _buildMedicineResolutionRow(
             context,
-            label: 'First',
+            label: context.l10n.text('interactions.result.first'),
             enteredName: firstEnteredName,
             detailLines: firstDetails,
           ),
           _buildMedicineResolutionRow(
             context,
-            label: 'Second',
+            label: context.l10n.text('interactions.result.second'),
             enteredName: secondEnteredName,
             detailLines: secondDetails,
           ),
@@ -597,6 +781,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final hasMechanism = (result.mechanism ?? '').trim().isNotEmpty;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -617,7 +802,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${result.firstDrug} + ${result.secondDrug}',
+            '${l10n.isolate(result.firstDrug)} + ${l10n.isolate(result.secondDrug)}',
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -632,7 +817,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
             _buildBulletSection(
               context,
               icon: Icons.science_outlined,
-              title: 'Mechanism',
+              title: l10n.text('interactions.result.why'),
               items: [result.mechanism!.trim()],
             ),
           ],
@@ -641,7 +826,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
             _buildBulletSection(
               context,
               icon: Icons.warning_amber_rounded,
-              title: 'Warnings',
+              title: l10n.text('interactions.result.warnings'),
               items: result.warnings,
             ),
           ],
@@ -650,7 +835,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
             _buildBulletSection(
               context,
               icon: Icons.health_and_safety_outlined,
-              title: 'Recommendations',
+              title: l10n.text('interactions.result.next'),
               items: result.recommendations,
             ),
           ],
@@ -659,7 +844,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
             _buildBulletSection(
               context,
               icon: Icons.info_outline,
-              title: 'Evidence',
+              title: l10n.text('interactions.result.evidence'),
               items: result.evidence,
             ),
           ],
@@ -682,11 +867,13 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
   }
 
   Widget _buildResultState(BuildContext context) {
+    final l10n = context.l10n;
+
     if (_errorMessage != null) {
       return _buildStateCard(
         context,
         icon: Icons.error_outline,
-        title: 'Interaction check failed',
+        title: l10n.text('interactions.result.errorTitle'),
         message: _errorMessage!,
         accentColor: Theme.of(context).colorScheme.error,
       );
@@ -700,16 +887,17 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
     return _buildStateCard(
       context,
       icon: Icons.medication_outlined,
-      title: 'Ready to check',
-      message:
-          'Search a pair to see real interaction data, warnings, and recommendations here.',
+      title: l10n.text('interactions.result.readyTitle'),
+      message: l10n.text('interactions.result.readyMessage'),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Check Drug Interactions')),
+      appBar: AppBar(title: Text(l10n.text('interactions.title'))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(18),
         child: Center(

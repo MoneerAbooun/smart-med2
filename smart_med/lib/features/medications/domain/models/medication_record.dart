@@ -143,6 +143,7 @@ class MedicationRecord {
     List<int>? notificationIds,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool clearEndDate = false,
   }) {
     return MedicationRecord(
       id: id ?? this.id,
@@ -160,7 +161,7 @@ class MedicationRecord {
       frequencyPerDay: frequencyPerDay ?? this.frequencyPerDay,
       scheduledTimes: scheduledTimes ?? this.scheduledTimes,
       startDate: startDate ?? this.startDate,
-      endDate: endDate ?? this.endDate,
+      endDate: clearEndDate ? null : endDate ?? this.endDate,
       instructions: instructions ?? this.instructions,
       notes: notes ?? this.notes,
       imageUrl: imageUrl ?? this.imageUrl,

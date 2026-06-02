@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:smart_med/features/onboarding/data/onboarding_preferences_repository.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
+import 'package:smart_med/features/onboarding/data/onboarding_preferences_repository.dart';
 
 class OnboardingPage extends StatefulWidget {
   const OnboardingPage({
@@ -20,30 +21,32 @@ class _OnboardingPageState extends State<OnboardingPage> {
   static const List<_OnboardingStep> _steps = <_OnboardingStep>[
     _OnboardingStep(
       icon: Icons.playlist_add_circle_outlined,
-      title: 'Quick Add Medications',
-      description:
-          'Save a medicine in a few taps, attach a photo when helpful, and keep everything organized in one place.',
+      titleKey: 'onboarding.step.add.title',
+      descriptionKey: 'onboarding.step.add.description',
       accent: Color(0xFF2E7D6F),
     ),
     _OnboardingStep(
       icon: Icons.compare_arrows_outlined,
-      title: 'Check Drug Interactions',
-      description:
-          'Compare medicines before taking them together so you can catch risky combinations and warnings early.',
+      titleKey: 'onboarding.step.interactions.title',
+      descriptionKey: 'onboarding.step.interactions.description',
       accent: Color(0xFFD47B2E),
     ),
     _OnboardingStep(
+      icon: Icons.health_and_safety_outlined,
+      titleKey: 'onboarding.step.profile.title',
+      descriptionKey: 'onboarding.step.profile.description',
+      accent: Color(0xFF2F8F46),
+    ),
+    _OnboardingStep(
       icon: Icons.photo_camera_back_outlined,
-      title: 'Search by Image',
-      description:
-          'Use the camera or gallery to identify medicine packaging, labels, or pills faster when typing is not convenient.',
+      titleKey: 'onboarding.step.photo.title',
+      descriptionKey: 'onboarding.step.photo.description',
       accent: Color(0xFF3B6FD8),
     ),
     _OnboardingStep(
       icon: Icons.notifications_active_outlined,
-      title: 'Get Reminders',
-      description:
-          'Add reminder times while saving medications so Smart Med can help you stay on schedule every day.',
+      titleKey: 'onboarding.step.reminders.title',
+      descriptionKey: 'onboarding.step.reminders.description',
       accent: Color(0xFF8A4FE0),
     ),
   ];
@@ -96,6 +99,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
 
     return Scaffold(
       body: SafeArea(
@@ -106,7 +110,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
               Row(
                 children: <Widget>[
                   Text(
-                    'Smart Med Tour',
+                    l10n.text('onboarding.title'),
                     style: textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -114,7 +118,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                   const Spacer(),
                   TextButton(
                     onPressed: _isSaving ? null : _finishOnboarding,
-                    child: const Text('Skip'),
+                    child: Text(l10n.text('onboarding.skip')),
                   ),
                 ],
               ),
@@ -146,7 +150,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             ),
                             const SizedBox(height: 28),
                             Text(
-                              step.title,
+                              l10n.text(step.titleKey),
                               textAlign: TextAlign.center,
                               style: textTheme.headlineMedium?.copyWith(
                                 fontWeight: FontWeight.bold,
@@ -154,7 +158,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
                             ),
                             const SizedBox(height: 14),
                             Text(
-                              step.description,
+                              l10n.text(step.descriptionKey),
                               textAlign: TextAlign.center,
                               style: textTheme.titleMedium?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
@@ -191,7 +195,10 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
               const SizedBox(height: 18),
               Text(
-                'Screen ${_currentIndex + 1} of ${_steps.length}',
+                l10n.format('onboarding.step', {
+                  'current': (_currentIndex + 1).toString(),
+                  'total': _steps.length.toString(),
+                }),
                 style: textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -218,8 +225,8 @@ class _OnboardingPageState extends State<OnboardingPage> {
                         )
                       : Text(
                           _currentIndex == _steps.length - 1
-                              ? 'Get Started'
-                              : 'Next',
+                              ? l10n.text('onboarding.getStarted')
+                              : l10n.text('onboarding.next'),
                         ),
                 ),
               ),
@@ -234,13 +241,13 @@ class _OnboardingPageState extends State<OnboardingPage> {
 class _OnboardingStep {
   const _OnboardingStep({
     required this.icon,
-    required this.title,
-    required this.description,
+    required this.titleKey,
+    required this.descriptionKey,
     required this.accent,
   });
 
   final IconData icon;
-  final String title;
-  final String description;
+  final String titleKey;
+  final String descriptionKey;
   final Color accent;
 }

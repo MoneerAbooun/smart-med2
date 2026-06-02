@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/core/services/notification_service.dart';
 import 'package:smart_med/features/auth/auth.dart';
 import 'package:smart_med/features/medications/medications.dart';
+import 'package:smart_med/core/widgets/app_snack_bar.dart';
 
 class SettingsPage extends StatefulWidget {
   final VoidCallback onEditProfileTap;
   final bool isDark;
   final ValueChanged<bool> onThemeChanged;
+  final Locale currentLocale;
+  final ValueChanged<Locale> onLocaleChanged;
 
   const SettingsPage({
     super.key,
     required this.onEditProfileTap,
     required this.isDark,
     required this.onThemeChanged,
+    required this.currentLocale,
+    required this.onLocaleChanged,
   });
 
   @override
@@ -85,6 +91,8 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void showSimpleDialogBox(String title, String content) {
+    final l10n = context.l10n;
+
     showDialog(
       context: context,
       builder: (context) {
@@ -94,7 +102,7 @@ class _SettingsPageState extends State<SettingsPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("OK"),
+              child: Text(l10n.text('common.ok')),
             ),
           ],
         );
@@ -105,24 +113,25 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return SafeArea(
       child: Scaffold(
         appBar: AppBar(
           toolbarHeight: 70,
-          title: const Padding(
-            padding: EdgeInsets.only(top: 10),
+          title: Padding(
+            padding: const EdgeInsets.only(top: 10),
             child: Text(
-              "Settings",
-              style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+              l10n.text('settings.title'),
+              style: const TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
             ),
           ),
           actions: [
             Padding(
-              padding: const EdgeInsets.only(top: 10, right: 8),
+              padding: const EdgeInsetsDirectional.only(top: 10, end: 8),
               child: IconButton(
                 icon: const Icon(Icons.medication_outlined, size: 28),
-                tooltip: 'Medications',
+                tooltip: l10n.text('home.action.medicines'),
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -151,7 +160,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     children: [
                       Center(
                         child: Text(
-                          "Settings",
+                          l10n.text('settings.title'),
                           style: Theme.of(context).textTheme.headlineSmall
                               ?.copyWith(
                                 fontWeight: FontWeight.bold,
@@ -162,14 +171,14 @@ class _SettingsPageState extends State<SettingsPage> {
                       const SizedBox(height: 25),
                       buildSettingItem(
                         icon: Icons.person_outline,
-                        title: "Edit Profile",
+                        title: l10n.text('settings.editProfile'),
                         onTap: widget.onEditProfileTap,
                       ),
                       buildSettingItem(
                         icon: widget.isDark
                             ? Icons.dark_mode_outlined
                             : Icons.light_mode_outlined,
-                        title: "Dark Mode",
+                        title: l10n.text('settings.darkMode'),
                         trailing: Switch(
                           value: widget.isDark,
                           onChanged: widget.onThemeChanged,
@@ -177,7 +186,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       ),
                       buildSettingItem(
                         icon: Icons.notifications_none,
-                        title: "Notification Settings",
+                        title: l10n.text('settings.notifications'),
                         trailing: Switch(
                           value: notificationsEnabled,
                           onChanged: (value) async {
@@ -188,12 +197,10 @@ class _SettingsPageState extends State<SettingsPage> {
                               if (!granted) {
                                 if (!context.mounted) return;
 
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Notification permission denied',
-                                    ),
-                                  ),
+                                AppSnackBar.show(
+                                  context,
+                                  l10n.text('settings.notifications.blocked'),
+                                  type: AppSnackBarType.error,
                                 );
 
                                 setState(() {
@@ -206,8 +213,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                 true,
                               );
                               await NotificationService.showInstantNotification(
-                                title: 'Smart Med',
-                                body: 'This is a test notification',
+                                title: l10n.text('app.name'),
+                                body: l10n.text('settings.notifications.ready'),
                               );
 
                               if (!context.mounted) return;
@@ -216,12 +223,10 @@ class _SettingsPageState extends State<SettingsPage> {
                                 notificationsEnabled = true;
                               });
 
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Notifications enabled and reminders synced',
-                                  ),
-                                ),
+                              AppSnackBar.show(
+                                context,
+                                l10n.text('settings.notifications.on'),
+                                type: AppSnackBarType.success,
                               );
                             } else {
                               await NotificationService.setNotificationsEnabled(
@@ -234,87 +239,95 @@ class _SettingsPageState extends State<SettingsPage> {
 
                               if (!context.mounted) return;
 
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Notifications turned off and cleared',
-                                  ),
-                                ),
+                              AppSnackBar.show(
+                                context,
+                                l10n.text('settings.notifications.off'),
+                                type: AppSnackBarType.info,
                               );
                             }
                           },
                         ),
                       ),
                       buildSettingItem(
+                        icon: Icons.language,
+                        title: l10n.text('settings.language'),
+                        trailing: DropdownButton<String>(
+                          value: widget.currentLocale.languageCode,
+                          underline: const SizedBox.shrink(),
+                          items: [
+                            DropdownMenuItem(
+                              value: 'en',
+                              child: Text(l10n.text('common.english')),
+                            ),
+                            DropdownMenuItem(
+                              value: 'ar',
+                              child: Text(l10n.text('common.arabic')),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) return;
+                            widget.onLocaleChanged(Locale(value));
+                          },
+                        ),
+                      ),
+                      buildSettingItem(
                         icon: Icons.info_outline,
-                        title: "About Us",
+                        title: l10n.text('settings.about'),
                         onTap: () {
                           showSimpleDialogBox(
-                            "About Us",
-                            "Smart Med is a smart medication assistant project that helps users manage medicines, reminders, and drug information.",
+                            l10n.text('settings.about'),
+                            l10n.text('settings.about.body'),
                           );
                         },
                       ),
                       buildSettingItem(
                         icon: Icons.contact_mail_outlined,
-                        title: "Contact Us",
+                        title: l10n.text('settings.contact'),
                         onTap: () {
                           showSimpleDialogBox(
-                            "Contact Us",
-                            "Email: smartmed@app.com\nPhone: +000 000 000 000",
-                          );
-                        },
-                      ),
-                      buildSettingItem(
-                        icon: Icons.language,
-                        title: "Language",
-                        onTap: () {
-                          showSimpleDialogBox(
-                            "Language",
-                            "Language setting will be added later.",
+                            l10n.text('settings.contact'),
+                            l10n.text('settings.contact.body'),
                           );
                         },
                       ),
                       buildSettingItem(
                         icon: Icons.help_outline,
-                        title: "Help",
+                        title: l10n.text('settings.help'),
                         onTap: () {
                           showSimpleDialogBox(
-                            "Help",
-                            "This section will include help and FAQ later.",
+                            l10n.text('settings.help'),
+                            l10n.text('settings.help.body'),
                           );
                         },
                       ),
                       buildSettingItem(
                         icon: Icons.system_update_alt,
-                        title: "App Version",
+                        title: l10n.text('settings.version'),
                         onTap: () {
                           showSimpleDialogBox(
-                            "App Version",
-                            "Smart Med v1.0.0",
+                            l10n.text('settings.version'),
+                            l10n.text('settings.version.body'),
                           );
                         },
                       ),
                       buildSettingItem(
                         icon: Icons.logout,
-                        title: "Logout",
+                        title: l10n.text('common.signOut'),
                         onTap: () async {
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
-                              title: const Text("Logout"),
-                              content: const Text(
-                                "Are you sure you want to logout?",
-                              ),
+                              title: Text(l10n.text('settings.signOut.title')),
+                              content: Text(l10n.text('settings.signOut.body')),
                               actions: [
                                 TextButton(
                                   onPressed: () =>
                                       Navigator.pop(context, false),
-                                  child: const Text("Cancel"),
+                                  child: Text(l10n.text('common.cancel')),
                                 ),
                                 TextButton(
                                   onPressed: () => Navigator.pop(context, true),
-                                  child: const Text("Logout"),
+                                  child: Text(l10n.text('common.signOut')),
                                 ),
                               ],
                             ),

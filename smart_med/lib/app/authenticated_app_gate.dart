@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/app/main_shell.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/features/auth/auth.dart';
@@ -12,11 +13,15 @@ class AuthenticatedAppGate extends StatefulWidget {
     required this.user,
     required this.isDark,
     required this.onThemeChanged,
+    required this.currentLocale,
+    required this.onLocaleChanged,
   });
 
   final User user;
   final bool isDark;
   final ValueChanged<bool> onThemeChanged;
+  final Locale currentLocale;
+  final ValueChanged<Locale> onLocaleChanged;
 
   @override
   State<AuthenticatedAppGate> createState() => _AuthenticatedAppGateState();
@@ -85,7 +90,7 @@ class _AuthenticatedAppGateState extends State<AuthenticatedAppGate> {
     return profileRepository.watchProfile(uid: widget.user.uid);
   }
 
-  String _bootstrapErrorMessage(Object error) {
+  String _bootstrapErrorMessage(BuildContext context, Object error) {
     if (error is ProfileRepositoryException) {
       return error.message;
     }
@@ -94,7 +99,7 @@ class _AuthenticatedAppGateState extends State<AuthenticatedAppGate> {
       return error.message;
     }
 
-    return 'Retry to create or repair the user document, or sign out to try again later.';
+    return context.l10n.text('gate.profileError.retry');
   }
 
   Widget _buildLoadingScaffold(String message) {
@@ -114,11 +119,13 @@ class _AuthenticatedAppGateState extends State<AuthenticatedAppGate> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return FutureBuilder<UserProfileRecord>(
       future: _bootstrapFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return _buildLoadingScaffold('Preparing your profile...');
+          return _buildLoadingScaffold(l10n.text('gate.loadingProfile'));
         }
 
         if (snapshot.hasError) {
@@ -140,13 +147,13 @@ class _AuthenticatedAppGateState extends State<AuthenticatedAppGate> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'We could not finish loading your Firestore profile.',
+                        l10n.text('gate.profileError.title'),
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        _bootstrapErrorMessage(snapshot.error!),
+                        _bootstrapErrorMessage(context, snapshot.error!),
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
@@ -155,7 +162,7 @@ class _AuthenticatedAppGateState extends State<AuthenticatedAppGate> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: _retryBootstrap,
-                          child: const Text('Retry'),
+                          child: Text(l10n.text('common.retry')),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -163,7 +170,7 @@ class _AuthenticatedAppGateState extends State<AuthenticatedAppGate> {
                         width: double.infinity,
                         child: OutlinedButton(
                           onPressed: _signOut,
-                          child: const Text('Sign Out'),
+                          child: Text(l10n.text('common.signOut')),
                         ),
                       ),
                     ],
@@ -178,7 +185,7 @@ class _AuthenticatedAppGateState extends State<AuthenticatedAppGate> {
           future: _shouldShowOnboardingFuture,
           builder: (context, onboardingSnapshot) {
             if (onboardingSnapshot.connectionState != ConnectionState.done) {
-              return _buildLoadingScaffold('Loading your Smart Med tools...');
+              return _buildLoadingScaffold(l10n.text('gate.loadingTools'));
             }
 
             if (onboardingSnapshot.data ?? false) {
@@ -207,6 +214,8 @@ class _AuthenticatedAppGateState extends State<AuthenticatedAppGate> {
                 return MainShell(
                   isDark: widget.isDark,
                   onThemeChanged: widget.onThemeChanged,
+                  currentLocale: widget.currentLocale,
+                  onLocaleChanged: widget.onLocaleChanged,
                 );
               },
             );

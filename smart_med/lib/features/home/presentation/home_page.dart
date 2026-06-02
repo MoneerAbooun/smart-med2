@@ -4,12 +4,15 @@ import 'package:camera/camera.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/features/alternative_drug/alternative_drug.dart';
 import 'package:smart_med/features/interactions/interactions.dart';
 import 'package:smart_med/features/medications/medications.dart';
 import 'package:smart_med/features/medicine_search/medicine_search.dart';
+import 'package:smart_med/features/onboarding/onboarding.dart';
 import 'package:smart_med/features/profile/profile.dart';
+import 'package:smart_med/core/widgets/app_snack_bar.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -44,6 +47,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Future<void> _openPatientMedicationInteractionChecker() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PatientMedicationInteractionPage(),
+      ),
+    );
+  }
+
   Future<void> _openMedicationList() async {
     await Navigator.push(
       context,
@@ -64,6 +76,22 @@ class _HomePageState extends State<HomePage> {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const ProfilePage()),
+    );
+  }
+
+  Future<void> _openQuickProfileSetup(UserProfileRecord profile) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (setupContext) => QuickProfileSetupPage(
+          profile: profile,
+          onFinished: () {
+            if (Navigator.of(setupContext).canPop()) {
+              Navigator.of(setupContext).pop();
+            }
+          },
+        ),
+      ),
     );
   }
 
@@ -163,9 +191,13 @@ class _HomePageState extends State<HomePage> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
+      AppSnackBar.show(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to open camera: $e')));
+        context.l10n.format('home.camera.openError', <String, String>{
+          'error': context.l10n.isolate(e.toString()),
+        }),
+        type: AppSnackBarType.error,
+      );
     }
   }
 
@@ -200,9 +232,13 @@ class _HomePageState extends State<HomePage> {
         isCapturing = false;
       });
 
-      ScaffoldMessenger.of(
+      AppSnackBar.show(
         context,
-      ).showSnackBar(SnackBar(content: Text('Failed to capture image: $e')));
+        context.l10n.format('home.camera.captureError', <String, String>{
+          'error': context.l10n.isolate(e.toString()),
+        }),
+        type: AppSnackBarType.error,
+      );
     }
   }
 
@@ -221,7 +257,7 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  String _displayName([UserProfileRecord? profile]) {
+  String _displayName(BuildContext context, [UserProfileRecord? profile]) {
     final profileName = profile?.displayName.trim();
     if (profileName != null && profileName.isNotEmpty) {
       return profileName.split(' ').first;
@@ -239,41 +275,39 @@ class _HomePageState extends State<HomePage> {
       return email.split('@').first;
     }
 
-    return 'there';
+    return context.l10n.text('home.greeting.fallback');
   }
 
-  List<_HomeActionItem> _actionItems() {
+  List<_HomeActionItem> _actionItems(BuildContext context) {
+    final l10n = context.l10n;
+
     return <_HomeActionItem>[
       _HomeActionItem(
         icon: Icons.search_outlined,
-        title: 'Find Medicine Details',
-        subtitle: 'Look up names or photos',
-        tooltip:
-            'Find medicine details by name or image, then review key information before you take it.',
+        title: l10n.text('home.action.details'),
+        subtitle: l10n.text('home.action.details.subtitle'),
+        tooltip: l10n.text('home.action.details.tooltip'),
         onTap: () => _openMedicineSearch(),
       ),
       _HomeActionItem(
         icon: Icons.compare_arrows_outlined,
-        title: 'Check Drug Interactions',
-        subtitle: 'See if medicines conflict',
-        tooltip:
-            'Compare medicines to catch interaction warnings and safety risks before combining them.',
+        title: l10n.text('home.action.interactions'),
+        subtitle: l10n.text('home.action.interactions.subtitle'),
+        tooltip: l10n.text('home.action.interactions.tooltip'),
         onTap: _openInteractionChecker,
       ),
       _HomeActionItem(
         icon: Icons.medication_outlined,
-        title: 'My Active Medications',
-        subtitle: 'Review current medicines',
-        tooltip:
-            'Open your current medication list to review details, reminders, and any edits you need to make.',
+        title: l10n.text('home.action.medicines'),
+        subtitle: l10n.text('home.action.medicines.subtitle'),
+        tooltip: l10n.text('home.action.medicines.tooltip'),
         onTap: _openMedicationList,
       ),
       _HomeActionItem(
         icon: Icons.find_replace_outlined,
-        title: 'Related Medicines',
-        subtitle: 'Discuss alternatives safely',
-        tooltip:
-            'Search for related medicines you can discuss with a doctor or pharmacist before changing treatment.',
+        title: l10n.text('home.action.substitutes'),
+        subtitle: l10n.text('home.action.substitutes.subtitle'),
+        tooltip: l10n.text('home.action.substitutes.tooltip'),
         onTap: _openAlternativeDrugSearch,
       ),
     ];
@@ -282,6 +316,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildGreetingCard(BuildContext context, UserProfileRecord? profile) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -313,14 +348,16 @@ class _HomePageState extends State<HomePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Hello, ${_displayName(profile)}',
+                  l10n.format('home.greeting.title', <String, String>{
+                    'name': l10n.isolate(_displayName(context, profile)),
+                  }),
                   style: textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Here is what needs attention today.',
+                  l10n.text('home.greeting.subtitle'),
                   style: textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -335,7 +372,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildSectionTitle(BuildContext context, String title) {
     return Align(
-      alignment: Alignment.centerLeft,
+      alignment: AlignmentDirectional.centerStart,
       child: Text(
         title,
         style: Theme.of(
@@ -449,50 +486,66 @@ class _HomePageState extends State<HomePage> {
     return TimeOfDay.fromDateTime(value).format(context);
   }
 
-  String _relativeDoseLabel(_HomeDose dose) {
+  String _relativeDoseLabel(BuildContext context, _HomeDose dose) {
+    final l10n = context.l10n;
     final now = DateTime.now();
     final today = _startOfDay(now);
     final doseDay = _startOfDay(dose.displayAt);
 
     if (dose.isSnoozed) {
-      return 'Snoozed';
+      return l10n.text('home.dose.snoozed');
     }
 
     if (dose.displayAt.isBefore(now)) {
-      return 'Overdue';
+      return l10n.text('home.dose.overdue');
     }
 
     if (doseDay == today) {
-      return 'Today';
+      return l10n.text('home.dose.today');
     }
 
-    return 'Tomorrow';
+    return l10n.text('home.dose.tomorrow');
+  }
+
+  bool _isDoseDue(_HomeDose dose, DateTime now) {
+    return !dose.displayAt.isAfter(now);
+  }
+
+  bool _isDoseOverdue(_HomeDose dose, DateTime now) {
+    return dose.displayAt.isBefore(now);
   }
 
   void _showHomeMessage(String message) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+    AppSnackBar.show(context, message, type: AppSnackBarType.success);
   }
 
-  void _markDoseHandled(_HomeDose dose, String action) {
+  void _markDoseHandled(_HomeDose dose, String messageKey) {
     setState(() {
       _handledDoseKeys.add(dose.key);
       _snoozedDoses.remove(dose.key);
     });
 
-    _showHomeMessage('${dose.medication.name} marked as $action.');
+    final l10n = context.l10n;
+    _showHomeMessage(
+      l10n.format(messageKey, <String, String>{
+        'medicine': l10n.isolate(dose.medication.name),
+      }),
+    );
   }
 
   void _snoozeDose(_HomeDose dose) {
-    final snoozedUntil = DateTime.now().add(const Duration(minutes: 15));
+    final snoozedUntil = dose.displayAt.add(const Duration(minutes: 30));
 
     setState(() {
       _snoozedDoses[dose.key] = snoozedUntil;
     });
 
+    final l10n = context.l10n;
     _showHomeMessage(
-      '${dose.medication.name} snoozed until ${_formatDoseTime(context, snoozedUntil)}.',
+      l10n.format('home.dose.snoozedUntil', <String, String>{
+        'medicine': l10n.isolate(dose.medication.name),
+        'time': l10n.isolate(_formatDoseTime(context, snoozedUntil)),
+      }),
     );
   }
 
@@ -503,15 +556,25 @@ class _HomePageState extends State<HomePage> {
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     final activeMedications = _activeMedications(medications);
     final timeline = _buildDoseTimeline(activeMedications);
     final nextDose = timeline.isEmpty ? null : timeline.first;
+    final now = DateTime.now();
+    final isNextDoseOverdue = nextDose != null && _isDoseOverdue(nextDose, now);
+    final canMarkNextDoseTaken = nextDose != null && _isDoseDue(nextDose, now);
+    final cardBackgroundColor = isNextDoseOverdue
+        ? colorScheme.error
+        : colorScheme.primary;
+    final cardForegroundColor = isNextDoseOverdue
+        ? colorScheme.onError
+        : colorScheme.onPrimary;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.primary,
+        color: cardBackgroundColor,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
@@ -529,15 +592,15 @@ class _HomePageState extends State<HomePage> {
                   height: 22,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.2,
-                    color: colorScheme.onPrimary,
+                    color: cardForegroundColor,
                   ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Text(
-                    'Loading today\'s medication schedule...',
+                    l10n.text('home.schedule.loading'),
                     style: textTheme.bodyLarge?.copyWith(
-                      color: colorScheme.onPrimary,
+                      color: cardForegroundColor,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -554,7 +617,7 @@ class _HomePageState extends State<HomePage> {
                       icon: activeMedications.isEmpty
                           ? Icons.add_box_outlined
                           : Icons.check_circle_outline,
-                      accentColor: colorScheme.onPrimary,
+                      accentColor: cardForegroundColor,
                       size: 54,
                       iconSize: 28,
                       borderRadius: 18,
@@ -563,10 +626,10 @@ class _HomePageState extends State<HomePage> {
                     Expanded(
                       child: Text(
                         activeMedications.isEmpty
-                            ? 'No active medications yet'
-                            : 'No more doses today',
+                            ? l10n.text('home.noMedicines.title')
+                            : l10n.text('home.noDoses.title'),
                         style: textTheme.titleLarge?.copyWith(
-                          color: colorScheme.onPrimary,
+                          color: cardForegroundColor,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -576,10 +639,10 @@ class _HomePageState extends State<HomePage> {
                 const SizedBox(height: 10),
                 Text(
                   activeMedications.isEmpty
-                      ? 'Add your first medicine to see your next dose here.'
-                      : 'You are clear for the rest of today based on your current schedule.',
+                      ? l10n.text('home.noMedicines.body')
+                      : l10n.text('home.noDoses.body'),
                   style: textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onPrimary.withValues(alpha: 0.92),
+                    color: cardForegroundColor.withValues(alpha: 0.92),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -588,10 +651,10 @@ class _HomePageState extends State<HomePage> {
                   child: FilledButton.icon(
                     onPressed: _openAddMedication,
                     icon: const Icon(Icons.add),
-                    label: const Text('Add Medication'),
+                    label: Text(l10n.text('common.addMedicine')),
                     style: FilledButton.styleFrom(
-                      backgroundColor: colorScheme.onPrimary,
-                      foregroundColor: colorScheme.primary,
+                      backgroundColor: cardForegroundColor,
+                      foregroundColor: cardBackgroundColor,
                     ),
                   ),
                 ),
@@ -605,7 +668,7 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     AppIconBadge(
                       icon: Icons.notifications_active_outlined,
-                      accentColor: colorScheme.onPrimary,
+                      accentColor: cardForegroundColor,
                       size: 54,
                       iconSize: 28,
                       borderRadius: 18,
@@ -616,19 +679,17 @@ class _HomePageState extends State<HomePage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Next Dose',
+                            l10n.text('home.nextDose.title'),
                             style: textTheme.titleSmall?.copyWith(
-                              color: colorScheme.onPrimary.withValues(
-                                alpha: 0.9,
-                              ),
+                              color: cardForegroundColor.withValues(alpha: 0.9),
                               fontWeight: FontWeight.w700,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            nextDose.medication.name,
+                            l10n.isolate(nextDose.medication.name),
                             style: textTheme.titleLarge?.copyWith(
-                              color: colorScheme.onPrimary,
+                              color: cardForegroundColor,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -641,13 +702,13 @@ class _HomePageState extends State<HomePage> {
                         vertical: 7,
                       ),
                       decoration: BoxDecoration(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.16),
+                        color: cardForegroundColor.withValues(alpha: 0.16),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        _relativeDoseLabel(nextDose),
+                        _relativeDoseLabel(context, nextDose),
                         style: textTheme.labelMedium?.copyWith(
-                          color: colorScheme.onPrimary,
+                          color: cardForegroundColor,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -656,9 +717,14 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  '${nextDose.medication.dosage} at ${_formatDoseTime(context, nextDose.displayAt)}',
+                  l10n.format('home.dose.detail', <String, String>{
+                    'dosage': l10n.isolate(nextDose.medication.dosage),
+                    'time': l10n.isolate(
+                      _formatDoseTime(context, nextDose.displayAt),
+                    ),
+                  }),
                   style: textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onPrimary,
+                    color: cardForegroundColor,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -666,9 +732,9 @@ class _HomePageState extends State<HomePage> {
                   Padding(
                     padding: const EdgeInsets.only(top: 6),
                     child: Text(
-                      nextDose.medication.instructions!.trim(),
+                      l10n.isolate(nextDose.medication.instructions!.trim()),
                       style: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onPrimary.withValues(alpha: 0.92),
+                        color: cardForegroundColor.withValues(alpha: 0.92),
                       ),
                     ),
                   ),
@@ -678,33 +744,45 @@ class _HomePageState extends State<HomePage> {
                   runSpacing: 10,
                   children: [
                     FilledButton.icon(
-                      onPressed: () => _markDoseHandled(nextDose, 'taken'),
+                      onPressed: canMarkNextDoseTaken
+                          ? () => _markDoseHandled(
+                              nextDose,
+                              'home.dose.markedTaken',
+                            )
+                          : null,
                       icon: const Icon(Icons.check),
-                      label: const Text('Taken'),
+                      label: Text(l10n.text('home.dose.taken')),
                       style: FilledButton.styleFrom(
-                        backgroundColor: colorScheme.onPrimary,
-                        foregroundColor: colorScheme.primary,
+                        backgroundColor: cardForegroundColor,
+                        foregroundColor: cardBackgroundColor,
+                        disabledBackgroundColor: cardForegroundColor.withValues(
+                          alpha: 0.18,
+                        ),
+                        disabledForegroundColor: cardForegroundColor.withValues(
+                          alpha: 0.7,
+                        ),
                       ),
                     ),
                     OutlinedButton.icon(
                       onPressed: () => _snoozeDose(nextDose),
                       icon: const Icon(Icons.snooze),
-                      label: const Text('Snooze'),
+                      label: Text(l10n.text('home.dose.snooze')),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: colorScheme.onPrimary,
+                        foregroundColor: cardForegroundColor,
                         side: BorderSide(
-                          color: colorScheme.onPrimary.withValues(alpha: 0.7),
+                          color: cardForegroundColor.withValues(alpha: 0.7),
                         ),
                       ),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () => _markDoseHandled(nextDose, 'skipped'),
+                      onPressed: () =>
+                          _markDoseHandled(nextDose, 'home.dose.markedSkipped'),
                       icon: const Icon(Icons.close),
-                      label: const Text('Skip'),
+                      label: Text(l10n.text('home.dose.skip')),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: colorScheme.onPrimary,
+                        foregroundColor: cardForegroundColor,
                         side: BorderSide(
-                          color: colorScheme.onPrimary.withValues(alpha: 0.7),
+                          color: cardForegroundColor.withValues(alpha: 0.7),
                         ),
                       ),
                     ),
@@ -715,38 +793,52 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  int _profileReadinessCount(
-    UserProfileRecord? profile,
-    int activeMedicationCount,
-  ) {
+  static const int _safetyProfileItemCount = 4;
+
+  bool _hasBloodPressure(UserProfileRecord? profile) {
+    return profile?.systolicPressure != null &&
+        profile?.diastolicPressure != null;
+  }
+
+  bool _isSafetyProfileReady(UserProfileRecord? profile) {
     if (profile == null) {
-      return activeMedicationCount > 0 ? 1 : 0;
+      return false;
+    }
+
+    return profile.hasCompletedQuickProfileSetup ||
+        (profile.age != null &&
+            profile.weightKg != null &&
+            _hasBloodPressure(profile));
+  }
+
+  int _profileReadinessCount(UserProfileRecord? profile) {
+    if (profile == null) {
+      return 0;
+    }
+
+    if (_isSafetyProfileReady(profile)) {
+      return _safetyProfileItemCount;
     }
 
     return <bool>[
       profile.age != null,
-      profile.allergyNames.isNotEmpty,
-      profile.medicalConditionNames.isNotEmpty,
       profile.weightKg != null,
-      profile.systolicPressure != null && profile.diastolicPressure != null,
-      activeMedicationCount > 0,
+      _hasBloodPressure(profile),
+      profile.hasCompletedQuickProfileSetup,
     ].where((item) => item).length;
   }
 
-  List<String> _missingSafetyItems(
-    UserProfileRecord? profile,
-    int activeMedicationCount,
-  ) {
+  List<String> _missingSafetyItems(UserProfileRecord? profile) {
+    if (_isSafetyProfileReady(profile)) {
+      return const <String>[];
+    }
+
     return <String>[
-      if (profile?.age == null) 'Age',
-      if (profile == null || profile.allergyNames.isEmpty) 'Allergies',
-      if (profile == null || profile.medicalConditionNames.isEmpty)
-        'Conditions',
-      if (profile?.weightKg == null) 'Weight',
-      if (profile?.systolicPressure == null ||
-          profile?.diastolicPressure == null)
-        'Blood Pressure',
-      if (activeMedicationCount == 0) 'Active Meds',
+      if (profile?.age == null) 'home.safety.missing.age',
+      if (profile?.weightKg == null) 'home.safety.missing.weight',
+      if (!_hasBloodPressure(profile)) 'home.safety.missing.bloodPressure',
+      if (profile == null || !profile.hasCompletedQuickProfileSetup)
+        'home.safety.missing.saveSetup',
     ];
   }
 
@@ -758,9 +850,10 @@ class _HomePageState extends State<HomePage> {
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final completed = _profileReadinessCount(profile, activeMedications.length);
-    final missing = _missingSafetyItems(profile, activeMedications.length);
-    final isComplete = completed == 6;
+    final l10n = context.l10n;
+    final isComplete = _isSafetyProfileReady(profile);
+    final completed = _profileReadinessCount(profile);
+    final missing = _missingSafetyItems(profile);
 
     return Container(
       width: double.infinity,
@@ -793,7 +886,7 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Safety Status',
+                      l10n.text('home.safety.title'),
                       style: textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -801,10 +894,16 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 4),
                     Text(
                       isLoading
-                          ? 'Loading your safety profile...'
+                          ? l10n.text('home.safety.loading')
                           : isComplete
-                          ? 'Your profile has the key details for stronger warnings.'
-                          : 'Profile $completed/6 complete. Add missing details for better safety checks.',
+                          ? l10n.text('home.safety.complete')
+                          : l10n.format(
+                              'home.safety.incomplete',
+                              <String, String>{
+                                'completed': completed.toString(),
+                                'total': _safetyProfileItemCount.toString(),
+                              },
+                            ),
                       style: textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -817,9 +916,12 @@ class _HomePageState extends State<HomePage> {
           if (!isLoading) ...[
             const SizedBox(height: 12),
             Text(
-              '${profile?.allergyNames.length ?? 0} allergies, '
-              '${profile?.medicalConditionNames.length ?? 0} conditions, '
-              '${activeMedications.length} active meds',
+              l10n.format('home.safety.summary', <String, String>{
+                'allergies': (profile?.allergyNames.length ?? 0).toString(),
+                'conditions': (profile?.medicalConditionNames.length ?? 0)
+                    .toString(),
+                'medicines': activeMedications.length.toString(),
+              }),
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
@@ -831,7 +933,7 @@ class _HomePageState extends State<HomePage> {
                 runSpacing: 8,
                 children: missing
                     .take(4)
-                    .map((label) {
+                    .map((labelKey) {
                       return Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -842,7 +944,7 @@ class _HomePageState extends State<HomePage> {
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          label,
+                          l10n.text(labelKey),
                           style: textTheme.labelMedium?.copyWith(
                             color: colorScheme.onSecondaryContainer,
                             fontWeight: FontWeight.w700,
@@ -854,25 +956,37 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _openProfilePage,
-                    icon: const Icon(Icons.person_outline),
-                    label: const Text('Complete Profile'),
-                  ),
+            if (isComplete)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _openPatientMedicationInteractionChecker,
+                  icon: const Icon(Icons.compare_arrows_outlined),
+                  label: Text(l10n.text('home.safety.checkMedicines')),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _openInteractionChecker,
-                    icon: const Icon(Icons.compare_arrows_outlined),
-                    label: const Text('Check Meds'),
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: profile == null
+                          ? _openProfilePage
+                          : () => _openQuickProfileSetup(profile),
+                      icon: const Icon(Icons.assignment_ind_outlined),
+                      label: Text(l10n.text('home.safety.finishProfile')),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _openPatientMedicationInteractionChecker,
+                      icon: const Icon(Icons.compare_arrows_outlined),
+                      label: Text(l10n.text('home.safety.checkMedicines')),
+                    ),
+                  ),
+                ],
+              ),
           ],
         ],
       ),
@@ -882,6 +996,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildQuickStartCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -895,7 +1010,7 @@ class _HomePageState extends State<HomePage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Quick Start',
+            l10n.text('home.quickStart.title'),
             style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 10),
@@ -905,7 +1020,7 @@ class _HomePageState extends State<HomePage> {
                 child: ElevatedButton.icon(
                   onPressed: _openAddMedication,
                   icon: const Icon(Icons.add),
-                  label: const Text('Add Med'),
+                  label: Text(l10n.text('common.addMedicine')),
                 ),
               ),
               const SizedBox(width: 10),
@@ -917,7 +1032,7 @@ class _HomePageState extends State<HomePage> {
                     });
                   },
                   icon: const Icon(Icons.document_scanner_outlined),
-                  label: const Text('Scan'),
+                  label: Text(l10n.text('home.quickStart.scanPhoto')),
                 ),
               ),
             ],
@@ -933,6 +1048,7 @@ class _HomePageState extends State<HomePage> {
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     final todayDoses = _buildTodayDoses(activeMedications);
 
     return Container(
@@ -957,7 +1073,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Today\'s Medications',
+                  l10n.text('home.today.title'),
                   style: textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -965,7 +1081,7 @@ class _HomePageState extends State<HomePage> {
               ),
               TextButton(
                 onPressed: _openMedicationList,
-                child: const Text('View All'),
+                child: Text(l10n.text('common.viewAll')),
               ),
             ],
           ),
@@ -973,8 +1089,8 @@ class _HomePageState extends State<HomePage> {
           if (todayDoses.isEmpty)
             Text(
               activeMedications.isEmpty
-                  ? 'No active medications yet.'
-                  : 'No more scheduled doses today.',
+                  ? l10n.text('home.today.noMedicines')
+                  : l10n.text('home.today.noMoreScheduled'),
               style: textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -1014,7 +1130,7 @@ class _HomePageState extends State<HomePage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  dose.medication.name,
+                                  l10n.isolate(dose.medication.name),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: textTheme.bodyLarge?.copyWith(
@@ -1023,7 +1139,7 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  dose.medication.dosage,
+                                  l10n.isolate(dose.medication.dosage),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: textTheme.bodySmall?.copyWith(
@@ -1035,7 +1151,9 @@ class _HomePageState extends State<HomePage> {
                           ),
                           const SizedBox(width: 10),
                           Text(
-                            _formatDoseTime(context, dose.displayAt),
+                            l10n.isolate(
+                              _formatDoseTime(context, dose.displayAt),
+                            ),
                             style: textTheme.bodyMedium?.copyWith(
                               fontWeight: FontWeight.w700,
                             ),
@@ -1052,7 +1170,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildActionGrid(BuildContext context) {
-    final List<_HomeActionItem> actionItems = _actionItems();
+    final List<_HomeActionItem> actionItems = _actionItems(context);
 
     return GridView.count(
       crossAxisCount: 2,
@@ -1136,9 +1254,9 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ),
-          Positioned(
+          PositionedDirectional(
             top: 10,
-            right: 10,
+            end: 10,
             child: _TileTooltipButton(message: tooltip),
           ),
         ],
@@ -1149,6 +1267,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildScanMedicineCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -1172,7 +1291,7 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Search by Image',
+                  l10n.text('home.scan.title'),
                   style: textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -1182,7 +1301,7 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Use the camera or gallery to identify a medicine from its label or package, then search it or add it to your list.',
+            l10n.text('home.scan.body'),
             style: textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -1203,7 +1322,7 @@ class _HomePageState extends State<HomePage> {
                     child: ElevatedButton.icon(
                       onPressed: openCamera,
                       icon: const Icon(Icons.photo_camera_outlined),
-                      label: const Text('Camera'),
+                      label: Text(l10n.text('common.camera')),
                     ),
                   ),
 
@@ -1213,7 +1332,7 @@ class _HomePageState extends State<HomePage> {
                     child: ElevatedButton.icon(
                       onPressed: pickImageFromGallery,
                       icon: const Icon(Icons.photo_library_outlined),
-                      label: const Text('Gallery'),
+                      label: Text(l10n.text('common.gallery')),
                     ),
                   ),
 
@@ -1223,7 +1342,11 @@ class _HomePageState extends State<HomePage> {
                     child: ElevatedButton.icon(
                       onPressed: isCapturing ? null : captureImage,
                       icon: const Icon(Icons.camera),
-                      label: Text(isCapturing ? 'Wait...' : 'Capture'),
+                      label: Text(
+                        isCapturing
+                            ? l10n.text('home.scan.holdOn')
+                            : l10n.text('home.scan.capture'),
+                      ),
                     ),
                   ),
 
@@ -1233,7 +1356,7 @@ class _HomePageState extends State<HomePage> {
                     child: OutlinedButton.icon(
                       onPressed: backToPlaceholder,
                       icon: const Icon(Icons.close),
-                      label: const Text('Clear'),
+                      label: Text(l10n.text('common.clear')),
                     ),
                   ),
               ],
@@ -1260,7 +1383,7 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Image selected and ready.',
+                      l10n.text('home.scan.photoReady'),
                       style: textTheme.bodyMedium,
                     ),
                   ),
@@ -1275,7 +1398,7 @@ class _HomePageState extends State<HomePage> {
                     onPressed: () =>
                         _openMedicineSearch(initialImage: selectedImage),
                     icon: const Icon(Icons.image_search_outlined),
-                    label: const Text('Search'),
+                    label: Text(l10n.text('common.search')),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1283,7 +1406,7 @@ class _HomePageState extends State<HomePage> {
                   child: OutlinedButton.icon(
                     onPressed: _continueWithSelectedImage,
                     icon: const Icon(Icons.add),
-                    label: const Text('Add Med'),
+                    label: Text(l10n.text('common.addMedicine')),
                   ),
                 ),
               ],
@@ -1297,6 +1420,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildPreviewCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -1342,14 +1466,14 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'No image selected',
+                        l10n.text('home.scan.noPhoto'),
                         style: textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Use the camera or gallery to search by image.',
+                        l10n.text('home.scan.placeholder'),
                         textAlign: TextAlign.center,
                         style: textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
@@ -1368,8 +1492,8 @@ class _HomePageState extends State<HomePage> {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      return const Scaffold(
-        body: Center(child: Text('No logged in user found')),
+      return Scaffold(
+        body: Center(child: Text(context.l10n.text('home.auth.signInPrompt'))),
       );
     }
 
@@ -1393,9 +1517,12 @@ class _HomePageState extends State<HomePage> {
                 child: Image.asset('assets/Capsule.png', fit: BoxFit.cover),
               ),
               const SizedBox(width: 8),
-              const Text(
-                'Smart Med',
-                style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
+              Text(
+                context.l10n.text('app.name'),
+                style: const TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -1404,7 +1531,7 @@ class _HomePageState extends State<HomePage> {
               width: 56,
               child: IconButton(
                 icon: const Icon(Icons.medication_outlined, size: 28),
-                tooltip: 'Medications',
+                tooltip: context.l10n.text('common.medications'),
                 onPressed: _openMedicationList,
               ),
             ),
@@ -1465,7 +1592,10 @@ class _HomePageState extends State<HomePage> {
                             activeMedications: activeMedications,
                           ),
                           const SizedBox(height: 18),
-                          _buildSectionTitle(context, 'Tools'),
+                          _buildSectionTitle(
+                            context,
+                            context.l10n.text('home.tools.title'),
+                          ),
                           const SizedBox(height: 12),
                           _buildActionGrid(context),
                           const SizedBox(height: 80),

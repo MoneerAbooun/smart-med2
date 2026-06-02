@@ -2,9 +2,11 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/features/medications/medications.dart';
 import 'package:smart_med/features/profile/profile.dart';
+import 'package:smart_med/core/widgets/app_snack_bar.dart';
 
 class QuickProfileSetupPage extends StatefulWidget {
   const QuickProfileSetupPage({
@@ -132,7 +134,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
         return item.isNotEmpty;
       }).toList()..sort();
     } catch (_) {
-      nextConditionLoadError = 'Unable to load the condition list right now.';
+      nextConditionLoadError = 'quickProfile.conditions.loadError';
     }
 
     try {
@@ -151,7 +153,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
               ),
             );
     } catch (_) {
-      nextAllergyLoadError = 'Unable to load the medication search list.';
+      nextAllergyLoadError = 'quickProfile.allergies.loadError';
     }
 
     if (!mounted) {
@@ -167,11 +169,8 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
     });
   }
 
-  void _showMessage(String message) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(message)));
+  void _showMessage(String message, {AppSnackBarType? type}) {
+    AppSnackBar.show(context, message, type: type);
   }
 
   bool _containsIgnoreCase(List<String> values, String candidate) {
@@ -188,7 +187,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
     }
 
     if (_containsIgnoreCase(_selectedConditions, normalized)) {
-      _showMessage('That condition is already in your profile.');
+      _showMessage(context.l10n.text('quickProfile.conditionDuplicate'));
       return;
     }
 
@@ -213,7 +212,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
     }
 
     if (_containsIgnoreCase(_selectedAllergies, normalized)) {
-      _showMessage('That allergy is already in your profile.');
+      _showMessage(context.l10n.text('quickProfile.allergyDuplicate'));
       return;
     }
 
@@ -233,15 +232,14 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
 
   List<String> _filteredConditionSuggestions() {
     final query = _conditionSearchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return const <String>[];
+    }
 
     return _availableConditions
         .where((condition) {
           if (_containsIgnoreCase(_selectedConditions, condition)) {
             return false;
-          }
-
-          if (query.isEmpty) {
-            return true;
           }
 
           return condition.toLowerCase().contains(query);
@@ -340,7 +338,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
 
       final message = error is ProfileRepositoryException
           ? error.message
-          : 'We could not save your health profile just now.';
+          : context.l10n.text('quickProfile.saveError');
       _showMessage(message);
     } finally {
       if (mounted) {
@@ -355,19 +353,19 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
     final shouldSkip = await showDialog<bool>(
       context: context,
       builder: (context) {
+        final l10n = context.l10n;
+
         return AlertDialog(
-          title: const Text('Skip quick health setup?'),
-          content: const Text(
-            'Some features will not work optimally until you add your medical details, conditions, allergies, and current medications.',
-          ),
+          title: Text(l10n.text('quickProfile.skip.title')),
+          content: Text(l10n.text('quickProfile.skip.body')),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Go Back'),
+              child: Text(l10n.text('common.goBack')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Skip Anyway'),
+              child: Text(l10n.text('quickProfile.skip.button')),
             ),
           ],
         );
@@ -399,7 +397,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
 
       final message = error is ProfileRepositoryException
           ? error.message
-          : 'We could not skip the setup right now.';
+          : context.l10n.text('quickProfile.skipError');
       _showMessage(message);
     } finally {
       if (mounted) {
@@ -428,6 +426,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
     required String emptyMessage,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     if (values.isEmpty) {
       return Text(
@@ -442,7 +441,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
       children: values
           .map((value) {
             return Chip(
-              label: Text(value),
+              label: Text(l10n.isolate(value)),
               onDeleted: _isSaving ? null : () => onDeleted(value),
             );
           })
@@ -452,10 +451,11 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
 
   Widget _buildConditionSection() {
     final suggestions = _filteredConditionSuggestions();
+    final l10n = context.l10n;
 
     return _SetupSectionCard(
-      title: 'What medical conditions do you have?',
-      subtitle: 'Select any that apply. Leave this blank if none.',
+      title: l10n.text('quickProfile.conditions.title'),
+      subtitle: l10n.text('quickProfile.conditions.subtitle'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -464,15 +464,15 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
             enabled: !_isSaving,
             onChanged: (_) => setState(() {}),
             onTapOutside: (_) => FocusScope.of(context).unfocus(),
-            decoration: const InputDecoration(
-              hintText: 'Search or add a condition',
-              prefixIcon: Icon(Icons.search),
+            decoration: InputDecoration(
+              hintText: l10n.text('quickProfile.conditions.search'),
+              prefixIcon: const Icon(Icons.search),
             ),
           ),
           if (_conditionLoadError != null) ...<Widget>[
             const SizedBox(height: 8),
             Text(
-              _conditionLoadError!,
+              l10n.text(_conditionLoadError!),
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ],
@@ -485,24 +485,32 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
             _buildSelectedChips(
               values: _selectedConditions,
               onDeleted: _removeCondition,
-              emptyMessage: 'No conditions selected yet.',
+              emptyMessage: l10n.text('quickProfile.conditions.none'),
             ),
             if (suggestions.isNotEmpty) ...<Widget>[
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              Column(
                 children: suggestions
                     .map((condition) {
-                      return FilterChip(
-                        label: Text(condition),
-                        selected: false,
-                        onSelected: _isSaving
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(l10n.isolate(condition)),
+                        trailing: const Icon(Icons.add_circle_outline),
+                        onTap: _isSaving
                             ? null
-                            : (_) => _addCondition(condition),
+                            : () => _addCondition(condition),
                       );
                     })
                     .toList(growable: false),
+              ),
+            ] else if (_conditionSearchController.text.trim().isNotEmpty &&
+                _conditionLoadError == null) ...<Widget>[
+              const SizedBox(height: 12),
+              Text(
+                l10n.text('quickProfile.noExact'),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
             if (_canAddCustomCondition) ...<Widget>[
@@ -512,7 +520,13 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
                     ? null
                     : () => _addCondition(_conditionSearchController.text),
                 icon: const Icon(Icons.add),
-                label: Text('Add "${_conditionSearchController.text.trim()}"'),
+                label: Text(
+                  l10n.format('quickProfile.addNamed', {
+                    'name': l10n.isolate(
+                      _conditionSearchController.text.trim(),
+                    ),
+                  }),
+                ),
               ),
             ],
           ],
@@ -523,11 +537,11 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
 
   Widget _buildAllergySection() {
     final suggestions = _filteredAllergySuggestions();
+    final l10n = context.l10n;
 
     return _SetupSectionCard(
-      title: 'Any drug allergies?',
-      subtitle:
-          'Search by brand or generic medicine name, then add every allergy that matters for safety checks.',
+      title: l10n.text('quickProfile.allergies.title'),
+      subtitle: l10n.text('quickProfile.allergies.subtitle'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -536,15 +550,15 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
             enabled: !_isSaving,
             onChanged: (_) => setState(() {}),
             onTapOutside: (_) => FocusScope.of(context).unfocus(),
-            decoration: const InputDecoration(
-              hintText: 'Search a medication allergy',
-              prefixIcon: Icon(Icons.search),
+            decoration: InputDecoration(
+              hintText: l10n.text('quickProfile.allergies.search'),
+              prefixIcon: const Icon(Icons.search),
             ),
           ),
           if (_allergyLoadError != null) ...<Widget>[
             const SizedBox(height: 8),
             Text(
-              _allergyLoadError!,
+              l10n.text(_allergyLoadError!),
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ],
@@ -557,7 +571,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
             _buildSelectedChips(
               values: _selectedAllergies,
               onDeleted: _removeAllergy,
-              emptyMessage: 'No allergies selected yet.',
+              emptyMessage: l10n.text('quickProfile.allergies.none'),
             ),
             if (suggestions.isNotEmpty) ...<Widget>[
               const SizedBox(height: 12),
@@ -566,10 +580,13 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
                     .map((option) {
                       return ListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: Text(option.storedValue),
+                        title: Text(l10n.isolate(option.storedValue)),
                         subtitle: option.subtitle == null
                             ? null
-                            : Text(option.subtitle!),
+                            : Text(
+                                '${l10n.text('common.brand')}: '
+                                '${l10n.isolate(option.subtitle!)}',
+                              ),
                         trailing: const Icon(Icons.add_circle_outline),
                         onTap: _isSaving
                             ? null
@@ -582,7 +599,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
                 _allergyLoadError == null) ...<Widget>[
               const SizedBox(height: 12),
               Text(
-                'No exact matches found. You can still add it manually.',
+                l10n.text('quickProfile.noExact'),
                 style: TextStyle(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -595,7 +612,11 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
                     ? null
                     : () => _addAllergy(_allergySearchController.text),
                 icon: const Icon(Icons.add),
-                label: Text('Add "${_allergySearchController.text.trim()}"'),
+                label: Text(
+                  l10n.format('quickProfile.addNamed', {
+                    'name': l10n.isolate(_allergySearchController.text.trim()),
+                  }),
+                ),
               ),
             ],
           ],
@@ -605,10 +626,11 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
   }
 
   Widget _buildMedicationSection() {
+    final l10n = context.l10n;
+
     return _SetupSectionCard(
-      title: 'Current medications',
-      subtitle:
-          'Optional, but strongly encouraged so interaction checks can use your real medication list.',
+      title: l10n.text('quickProfile.medicines.title'),
+      subtitle: l10n.text('quickProfile.medicines.subtitle'),
       child: StreamBuilder<List<MedicationRecord>>(
         stream: _medicationRepository.watchMedicationRecords(
           uid: widget.profile.authUid,
@@ -621,8 +643,12 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
             children: <Widget>[
               Text(
                 medications.isEmpty
-                    ? 'No current medications added yet.'
-                    : '${medications.length} medication${medications.length == 1 ? '' : 's'} linked to your account.',
+                    ? l10n.text('quickProfile.medicines.none')
+                    : medications.length == 1
+                    ? l10n.text('quickProfile.medicines.oneLinked')
+                    : l10n.format('quickProfile.medicines.countLinked', {
+                        'count': medications.length.toString(),
+                      }),
               ),
               if (medications.isNotEmpty) ...<Widget>[
                 const SizedBox(height: 12),
@@ -632,14 +658,16 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
                   children: medications
                       .take(4)
                       .map((medication) {
-                        return Chip(label: Text(medication.name));
+                        return Chip(label: Text(l10n.isolate(medication.name)));
                       })
                       .toList(growable: false),
                 ),
                 if (medications.length > 4) ...<Widget>[
                   const SizedBox(height: 8),
                   Text(
-                    '+${medications.length - 4} more in your medication list',
+                    l10n.format('quickProfile.medicines.more', {
+                      'count': (medications.length - 4).toString(),
+                    }),
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -654,13 +682,13 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
                   ElevatedButton.icon(
                     onPressed: _isSaving ? null : _openAddMedicationPage,
                     icon: const Icon(Icons.add),
-                    label: const Text('Add Medication'),
+                    label: Text(l10n.text('common.addMedicine')),
                   ),
                   if (medications.isNotEmpty)
                     OutlinedButton.icon(
                       onPressed: _isSaving ? null : _openMedicationListPage,
                       icon: const Icon(Icons.list_alt_outlined),
-                      label: const Text('Review List'),
+                      label: Text(l10n.text('quickProfile.medicines.review')),
                     ),
                 ],
               ),
@@ -765,24 +793,31 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
   }
 
   Widget _buildMedicalInfoSection() {
+    final l10n = context.l10n;
+
     return _SetupSectionCard(
-      title: 'Patient medical info',
-      subtitle:
-          'These details help later in calculating a safer medication dose.',
+      title: l10n.text('profile.health.title'),
+      subtitle: l10n.text('profile.health.subtitle'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _buildMedicalSectionLabel('Biological sex'),
+          _buildMedicalSectionLabel(l10n.text('profile.health.biologicalSex')),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             initialValue: _biologicalSex,
             decoration: _buildMedicalFieldDecoration(
-              hintText: 'Select biological sex',
+              hintText: l10n.text('quickProfile.health.selectSex'),
               prefixIcon: Icons.wc_outlined,
             ),
-            items: const <DropdownMenuItem<String>>[
-              DropdownMenuItem(value: 'male', child: Text('Male')),
-              DropdownMenuItem(value: 'female', child: Text('Female')),
+            items: <DropdownMenuItem<String>>[
+              DropdownMenuItem(
+                value: 'male',
+                child: Text(l10n.text('profile.health.male')),
+              ),
+              DropdownMenuItem(
+                value: 'female',
+                child: Text(l10n.text('profile.health.female')),
+              ),
             ],
             onChanged: _isSaving
                 ? null
@@ -806,7 +841,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
               Expanded(
                 child: _buildMedicalNumberField(
                   controller: _weightController,
-                  hintText: 'Weight (kg)',
+                  hintText: l10n.text('profile.health.weight'),
                   icon: Icons.monitor_weight_outlined,
                 ),
               ),
@@ -814,7 +849,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
               Expanded(
                 child: _buildMedicalNumberField(
                   controller: _heightController,
-                  hintText: 'Height (cm)',
+                  hintText: l10n.text('profile.health.height'),
                   icon: Icons.height_outlined,
                 ),
               ),
@@ -822,35 +857,35 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
           ),
           const SizedBox(height: 18),
           _buildMedicalSectionLabel(
-            'Blood pressure',
-            helper: 'SYS = upper number, DIA = lower number',
+            l10n.text('profile.health.bloodPressure'),
+            helper: l10n.text('profile.health.bloodPressureHelp'),
           ),
           const SizedBox(height: 10),
           _buildMedicalNumberField(
             controller: _systolicPressureController,
-            hintText: 'SYS / Upper',
+            hintText: l10n.text('profile.health.systolic'),
             icon: Icons.favorite_border,
             allowDecimal: false,
           ),
           const SizedBox(height: 12),
           _buildMedicalNumberField(
             controller: _diastolicPressureController,
-            hintText: 'DIA / Lower',
+            hintText: l10n.text('profile.health.diastolic'),
             icon: Icons.favorite,
             allowDecimal: false,
           ),
           const SizedBox(height: 18),
-          _buildMedicalSectionLabel('Blood glucose'),
+          _buildMedicalSectionLabel(l10n.text('profile.health.bloodGlucose')),
           const SizedBox(height: 10),
           _buildMedicalNumberField(
             controller: _bloodGlucoseController,
-            hintText: 'Blood glucose',
+            hintText: l10n.text('profile.health.bloodGlucose'),
             icon: Icons.bloodtype_outlined,
           ),
           if (_biologicalSex == 'female') ...<Widget>[
             const SizedBox(height: 12),
             _buildMedicalToggle(
-              title: 'Pregnant',
+              title: l10n.text('profile.health.pregnant'),
               value: _isPregnant,
               onChanged: _isSaving
                   ? null
@@ -862,7 +897,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
             ),
             const SizedBox(height: 10),
             _buildMedicalToggle(
-              title: 'Breastfeeding',
+              title: l10n.text('profile.health.breastfeeding'),
               value: _isBreastfeeding,
               onChanged: _isSaving
                   ? null
@@ -882,6 +917,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
     final isKeyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     final Widget footer = isKeyboardVisible
@@ -913,13 +949,13 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
                                   color: colorScheme.onPrimary,
                                 ),
                               )
-                            : const Text('Save and Continue'),
+                            : Text(l10n.text('quickProfile.saveContinue')),
                       ),
                     ),
                     const SizedBox(height: 10),
                     TextButton(
                       onPressed: _isSaving ? null : _skipForNow,
-                      child: const Text('Skip for Now'),
+                      child: Text(l10n.text('quickProfile.skip.button')),
                     ),
                   ],
                 ),
@@ -945,14 +981,14 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            'Finish your health profile',
+                            l10n.text('quickProfile.title'),
                             style: textTheme.headlineMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'This takes about a minute and helps Smart Med personalize interaction warnings, alternatives, and medication safety guidance.',
+                            l10n.text('quickProfile.subtitle'),
                             style: textTheme.titleMedium?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                               height: 1.4,
@@ -979,7 +1015,7 @@ class _QuickProfileSetupPageState extends State<QuickProfileSetupPage> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    'If you skip this step, some features will not work optimally until you fill it in later.',
+                                    l10n.text('quickProfile.callout'),
                                     style: textTheme.bodyLarge?.copyWith(
                                       color: colorScheme.onSecondaryContainer,
                                       height: 1.35,
@@ -1122,12 +1158,12 @@ class _MedicineSearchOption {
     final subtitle = brandName.isNotEmpty && genericName.isNotEmpty
         ? brandName == genericName
               ? null
-              : 'Brand: $brandName'
+              : brandName
         : null;
 
     return _MedicineSearchOption(
       displayLabel: brandName.isNotEmpty && genericName.isNotEmpty
-          ? '$brandName • $genericName'
+          ? '$brandName - $genericName'
           : storedValue,
       storedValue: storedValue,
       subtitle: subtitle,

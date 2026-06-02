@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:smart_med/core/config/app_config.dart';
 
@@ -27,16 +28,21 @@ class ApiClient {
     final baseUri = Uri.parse(AppConfig.apiBaseUrl);
     final normalizedPath = path.startsWith('/') ? path.substring(1) : path;
     final resolvedUri = baseUri.resolve(normalizedPath);
-    if (queryParameters.isEmpty) {
-      return resolvedUri;
+
+    final uri = queryParameters.isEmpty
+        ? resolvedUri
+        : resolvedUri.replace(
+            queryParameters: <String, String>{
+              ...resolvedUri.queryParameters,
+              ...queryParameters,
+            },
+          );
+
+    if (kDebugMode) {
+      debugPrint('API URL: $uri');
     }
 
-    return resolvedUri.replace(
-      queryParameters: <String, String>{
-        ...resolvedUri.queryParameters,
-        ...queryParameters,
-      },
-    );
+    return uri;
   }
 
   Future<Map<String, dynamic>> getJson({
@@ -91,16 +97,20 @@ class ApiClient {
     Future<http.Response> Function() request,
   ) async {
     try {
-      final response = await request().timeout(
-        const Duration(seconds: 15),
-        onTimeout: () {
-          throw const ApiClientException(
-            'Backend timeout. Check if FastAPI is running and the phone can reach the backend URL.',
-          );
-        },
-      );
+      final stopwatch = Stopwatch()..start();
+
+      final response = await request().timeout(const Duration(seconds: 45));
+
+      stopwatch.stop();
+
+      if (kDebugMode) {
+        debugPrint('API status: ${response.statusCode}');
+        debugPrint('API time: ${stopwatch.elapsedMilliseconds} ms');
+        debugPrint('API body: ${response.body}');
+      }
 
       final parsedBody = _parseJsonMap(response);
+
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final detail =
             parsedBody?['detail']?.toString() ??
@@ -109,14 +119,27 @@ class ApiClient {
       }
 
       if (parsedBody == null) {
-        throw const ApiClientException('The API returned an empty response.');
+        throw const ApiClientException(
+          'The API returned invalid or empty JSON response.',
+        );
       }
 
       return parsedBody;
-    } on http.ClientException {
+    } on TimeoutException {
       throw const ApiClientException(
-        'Unable to reach the backend. Check if FastAPI is running and the phone can reach the backend URL.',
+        'Backend timeout. The API did not respond within 45 seconds.',
       );
+    } on http.ClientException catch (error) {
+      throw ApiClientException('Unable to reach the backend: $error');
+    } on ApiClientException {
+      rethrow;
+    } catch (error, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('Unexpected API error: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+
+      throw ApiClientException('Unexpected API error: $error');
     }
   }
 

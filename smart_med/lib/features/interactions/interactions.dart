@@ -6,3 +6,4 @@ export 'data/models/interaction_history_record.dart';
 export 'domain/models/drug_interaction_lookup_result.dart';
 export 'presentation/pages/check_interactions_page.dart';
 export 'presentation/widgets/interaction_severity_chip.dart';
+export 'presentation/pages/patient_medication_interaction_page.dart';

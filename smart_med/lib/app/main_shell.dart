@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/features/home/presentation/home_page.dart';
 import 'package:smart_med/features/profile/profile.dart';
 import 'package:smart_med/features/settings/presentation/settings_page.dart';
@@ -6,11 +7,15 @@ import 'package:smart_med/features/settings/presentation/settings_page.dart';
 class MainShell extends StatefulWidget {
   final bool isDark;
   final ValueChanged<bool> onThemeChanged;
+  final Locale currentLocale;
+  final ValueChanged<Locale> onLocaleChanged;
 
   const MainShell({
     super.key,
     required this.isDark,
     required this.onThemeChanged,
+    required this.currentLocale,
+    required this.onLocaleChanged,
   });
 
   @override
@@ -19,12 +24,12 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _currentIndex = 0;
-  Widget? _profilePage;
+  int _profileRefreshToken = 0;
 
   void goToProfileTab() {
     setState(() {
       _currentIndex = 1;
-      _profilePage ??= const ProfilePage();
+      _profileRefreshToken++;
     });
   }
 
@@ -34,11 +39,13 @@ class _MainShellState extends State<MainShell> {
 
     final pages = [
       const HomePage(),
-      _profilePage ?? const SizedBox.shrink(),
+      ProfilePage(key: ValueKey(_profileRefreshToken)),
       SettingsPage(
         onEditProfileTap: goToProfileTab,
         isDark: widget.isDark,
         onThemeChanged: widget.onThemeChanged,
+        currentLocale: widget.currentLocale,
+        onLocaleChanged: widget.onLocaleChanged,
       ),
     ];
 
@@ -69,7 +76,7 @@ class _MainShellState extends State<MainShell> {
                   setState(() {
                     _currentIndex = value;
                     if (value == 1) {
-                      _profilePage ??= const ProfilePage();
+                      _profileRefreshToken++;
                     }
                   });
                 },
@@ -80,18 +87,18 @@ class _MainShellState extends State<MainShell> {
                 unselectedItemColor: colorScheme.onSurfaceVariant,
                 selectedFontSize: 12,
                 unselectedFontSize: 12,
-                items: const [
+                items: [
                   BottomNavigationBarItem(
-                    icon: Icon(Icons.home_outlined),
-                    label: "Home",
+                    icon: const Icon(Icons.home_outlined),
+                    label: context.l10n.text('nav.home'),
                   ),
                   BottomNavigationBarItem(
-                    icon: Icon(Icons.person_outline),
-                    label: "Profile",
+                    icon: const Icon(Icons.person_outline),
+                    label: context.l10n.text('nav.profile'),
                   ),
                   BottomNavigationBarItem(
-                    icon: Icon(Icons.settings_outlined),
-                    label: "Settings",
+                    icon: const Icon(Icons.settings_outlined),
+                    label: context.l10n.text('nav.settings'),
                   ),
                 ],
               ),

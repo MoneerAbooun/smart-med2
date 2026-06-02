@@ -3,9 +3,14 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
+import 'package:smart_med/data/medicine/medicine_name_entry.dart';
+import 'package:smart_med/data/medicine/medicine_name_repository.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/features/medicine_search/data/repositories/medicine_lookup_repository.dart';
+import 'package:smart_med/features/medicine_search/data/repositories/medicine_search_history_repository.dart';
 import 'package:smart_med/features/medicine_search/domain/models/medicine_lookup_result.dart';
+import 'package:smart_med/features/medicine_search/presentation/widgets/medicine_name_suggestion_helpers.dart';
 
 enum MedicineSearchMode { none, name, image }
 
@@ -22,6 +27,9 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
   final TextEditingController _nameController = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
   final MedicineLookupRepository _repository = medicineLookupRepository;
+  final MedicineSearchHistoryRepository _historyRepository =
+      medicineSearchHistoryRepository;
+  final MedicineNameRepository _medicineNameRepository = medicineNameRepository;
 
   bool _isSearching = false;
   String? _errorMessage;
@@ -34,21 +42,28 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
   CameraController? _cameraController;
   Future<void>? _initializeCameraFuture;
   String? _expandedSectionId;
+  List<String> _recentMedicineSearches = const <String>[];
+  List<MedicineNameEntry> _medicineNameEntries = const <MedicineNameEntry>[];
 
   @override
   void initState() {
     super.initState();
 
+    _nameController.addListener(_onMedicineNameInputChanged);
     _selectedImage = widget.initialImage;
 
     if (_selectedImage != null) {
       _selectedMode = MedicineSearchMode.image;
       _loadSelectedImageBytes();
     }
+
+    _loadSearchHistory();
+    _loadMedicineNameEntries();
   }
 
   @override
   void dispose() {
+    _nameController.removeListener(_onMedicineNameInputChanged);
     _nameController.dispose();
     _cameraController?.dispose();
     super.dispose();
@@ -102,7 +117,10 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = 'Failed to open camera: $e';
+        _errorMessage = context.l10n.format(
+          'home.camera.openError',
+          <String, String>{'error': context.l10n.isolate(e.toString())},
+        );
       });
     }
   }
@@ -145,7 +163,10 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
 
       setState(() {
         _isCapturing = false;
-        _errorMessage = 'Failed to capture image: $e';
+        _errorMessage = context.l10n.format(
+          'home.camera.captureError',
+          <String, String>{'error': context.l10n.isolate(e.toString())},
+        );
       });
     }
   }
@@ -184,7 +205,64 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
     });
   }
 
-  void _applyExample(String value) {
+  Future<void> _loadSearchHistory() async {
+    final history = await _historyRepository.loadHistory();
+
+    if (!mounted) return;
+
+    setState(() {
+      _recentMedicineSearches = history;
+    });
+  }
+
+  void _onMedicineNameInputChanged() {
+    if (!mounted) return;
+
+    setState(() {});
+  }
+
+  Future<void> _loadMedicineNameEntries() async {
+    try {
+      final entries = await _medicineNameRepository.loadEntries();
+
+      if (!mounted) return;
+
+      setState(() {
+        _medicineNameEntries = entries;
+      });
+    } catch (_) {
+      // Suggestions are a helper only. Searching still works if the local list fails.
+    }
+  }
+
+  List<MedicineNameEntry> _filteredMedicineSuggestions() {
+    return filterMedicineNameSuggestions(
+      _medicineNameEntries,
+      _nameController.text,
+    );
+  }
+
+  void _applyMedicineSuggestion(MedicineNameEntry entry) {
+    final value = medicineEntrySearchValue(entry);
+
+    setState(() {
+      _nameController.text = value;
+      _nameController.selection = TextSelection.collapsed(offset: value.length);
+      _errorMessage = null;
+    });
+  }
+
+  Future<void> _saveMedicineSearch(String value) async {
+    final history = await _historyRepository.saveSearch(value);
+
+    if (!mounted) return;
+
+    setState(() {
+      _recentMedicineSearches = history;
+    });
+  }
+
+  void _applyRecentMedicine(String value) {
     setState(() {
       _nameController.text = value;
       _errorMessage = null;
@@ -193,7 +271,12 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
 
   Future<void> _searchByName() async {
     FocusScope.of(context).unfocus();
-    await _runSearch(() => _repository.searchByName(_nameController.text));
+    final query = _nameController.text.trim();
+    final result = await _runSearch(() => _repository.searchByName(query));
+
+    if (result != null) {
+      await _saveMedicineSearch(query);
+    }
   }
 
   Future<void> _searchByImage() async {
@@ -201,7 +284,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
 
     if (image == null) {
       setState(() {
-        _errorMessage = 'Choose a medicine image before searching by image.';
+        _errorMessage = context.l10n.text('medicineSearch.choosePhoto');
       });
       return;
     }
@@ -210,7 +293,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
     await _runSearch(() => _repository.searchByImage(image: image));
   }
 
-  Future<void> _runSearch(
+  Future<MedicineLookupResult?> _runSearch(
     Future<MedicineLookupResult> Function() loader,
   ) async {
     setState(() {
@@ -222,29 +305,35 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
     try {
       final result = await loader();
 
-      if (!mounted) return;
+      if (!mounted) return null;
 
       setState(() {
         _result = result;
         _isSearching = false;
         _expandedSectionId = null;
       });
+
+      return result;
     } on MedicineLookupRepositoryException catch (error) {
-      if (!mounted) return;
+      if (!mounted) return null;
 
       setState(() {
         _errorMessage = error.message;
         _isSearching = false;
         _expandedSectionId = null;
       });
+
+      return null;
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted) return null;
 
       setState(() {
         _errorMessage = error.toString();
         _isSearching = false;
         _expandedSectionId = null;
       });
+
+      return null;
     }
   }
 
@@ -281,7 +370,11 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
     return '${normalized.substring(0, maxLength).trimRight()}...';
   }
 
-  String _sectionPreview(List<String> items, String emptyMessage) {
+  String _sectionPreview(
+    BuildContext context,
+    List<String> items,
+    String emptyMessage,
+  ) {
     final previewSource = items.isEmpty ? emptyMessage : items.first;
     final preview = _truncateText(previewSource);
 
@@ -289,15 +382,22 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
       return preview;
     }
 
-    return '$preview (+${items.length - 1} more)';
+    return context.l10n.format('medicineSearch.more', <String, String>{
+      'preview': context.l10n.isolate(preview),
+      'count': (items.length - 1).toString(),
+    });
   }
 
-  String _sectionCountLabel(List<String> items) {
+  String _sectionCountLabel(BuildContext context, List<String> items) {
     if (items.isEmpty) {
-      return 'Not available';
+      return context.l10n.text('common.notAvailable');
     }
 
-    return items.length == 1 ? '1 item' : '${items.length} items';
+    return items.length == 1
+        ? context.l10n.text('common.oneItem')
+        : context.l10n.format('common.itemCount', <String, String>{
+            'count': items.length.toString(),
+          });
   }
 
   InputDecoration _inputDecoration(
@@ -317,6 +417,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
 
   Widget _buildSearchModeChooser(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -337,14 +438,14 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'How do you want to find medicine details?',
+            l10n.text('medicineSearch.mode.title'),
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Choose one method first. You can switch later.',
+            l10n.text('medicineSearch.mode.subtitle'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -355,7 +456,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             child: ElevatedButton.icon(
               onPressed: () => _selectMode(MedicineSearchMode.name),
               icon: const Icon(Icons.search),
-              label: const Text('Search by Name'),
+              label: Text(l10n.text('common.useName')),
             ),
           ),
           const SizedBox(height: 12),
@@ -364,7 +465,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             child: OutlinedButton.icon(
               onPressed: () => _selectMode(MedicineSearchMode.image),
               icon: const Icon(Icons.image_search_outlined),
-              label: const Text('Search by Image'),
+              label: Text(l10n.text('common.usePhoto')),
             ),
           ),
         ],
@@ -372,8 +473,57 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
     );
   }
 
+  Widget _buildSearchHistoryChips({required bool disabled}) {
+    if (_recentMedicineSearches.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          context.l10n.text('common.recentSearches'),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _recentMedicineSearches
+              .map((medicine) {
+                return ActionChip(
+                  label: Text(context.l10n.isolate(medicine)),
+                  avatar: const Icon(Icons.history, size: 18),
+                  onPressed: disabled
+                      ? null
+                      : () => _applyRecentMedicine(medicine),
+                );
+              })
+              .toList(growable: false),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMedicineSuggestionsOrHistory({required bool disabled}) {
+    final query = _nameController.text.trim();
+
+    if (query.isNotEmpty) {
+      return MedicineNameSuggestionsList(
+        suggestions: _filteredMedicineSuggestions(),
+        onSelected: _applyMedicineSuggestion,
+        disabled: disabled,
+      );
+    }
+
+    return _buildSearchHistoryChips(disabled: disabled);
+  }
+
   Widget _buildNameSearchCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -394,14 +544,14 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Find details by medicine name',
+            l10n.text('medicineSearch.name.title'),
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Type a brand or generic name.',
+            l10n.text('medicineSearch.name.subtitle'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -412,8 +562,8 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             textInputAction: TextInputAction.search,
             decoration: _inputDecoration(
               context,
-              label: 'Medicine name',
-              hint: 'Example: ibuprofen',
+              label: l10n.text('common.medicineName'),
+              hint: l10n.text('common.exampleIbuprofen'),
             ),
             onSubmitted: (_) {
               if (!_isSearching) {
@@ -422,28 +572,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             },
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              ActionChip(
-                label: const Text('Ibuprofen'),
-                onPressed: _isSearching
-                    ? null
-                    : () => _applyExample('ibuprofen'),
-              ),
-              ActionChip(
-                label: const Text('Tylenol'),
-                onPressed: _isSearching ? null : () => _applyExample('Tylenol'),
-              ),
-              ActionChip(
-                label: const Text('Amoxicillin'),
-                onPressed: _isSearching
-                    ? null
-                    : () => _applyExample('amoxicillin'),
-              ),
-            ],
-          ),
+          _buildMedicineSuggestionsOrHistory(disabled: _isSearching),
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
@@ -456,7 +585,11 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                       child: CircularProgressIndicator(strokeWidth: 2.2),
                     )
                   : const Icon(Icons.search),
-              label: Text(_isSearching ? 'Searching...' : 'Search by Name'),
+              label: Text(
+                _isSearching
+                    ? l10n.text('common.searching')
+                    : l10n.text('medicineSearch.name.button'),
+              ),
             ),
           ),
         ],
@@ -466,6 +599,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
 
   Widget _buildImageSearchCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -479,14 +613,14 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Find details by image',
+            l10n.text('medicineSearch.image.title'),
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Choose a clear pill, bottle, or package photo. The app reads visible text, then searches the medicine.',
+            l10n.text('medicineSearch.image.subtitle'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -523,7 +657,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'No image selected',
+                            l10n.text('common.noImageSelected'),
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: colorScheme.onSurfaceVariant),
                           ),
@@ -545,7 +679,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                     child: ElevatedButton.icon(
                       onPressed: _isSearching ? null : _openInlineCamera,
                       icon: const Icon(Icons.photo_camera_outlined),
-                      label: const Text('Camera'),
+                      label: Text(l10n.text('common.camera')),
                     ),
                   ),
 
@@ -557,7 +691,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                           ? null
                           : () => _pickImage(ImageSource.gallery),
                       icon: const Icon(Icons.photo_library_outlined),
-                      label: const Text('Gallery'),
+                      label: Text(l10n.text('common.gallery')),
                     ),
                   ),
 
@@ -567,7 +701,11 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                     child: ElevatedButton.icon(
                       onPressed: _isCapturing ? null : _captureInlineImage,
                       icon: const Icon(Icons.camera),
-                      label: Text(_isCapturing ? 'Wait...' : 'Capture'),
+                      label: Text(
+                        _isCapturing
+                            ? l10n.text('common.wait')
+                            : l10n.text('common.capture'),
+                      ),
                     ),
                   ),
 
@@ -579,7 +717,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                           ? null
                           : _closeInlineCameraOrClearImage,
                       icon: const Icon(Icons.close),
-                      label: const Text('Clear'),
+                      label: Text(l10n.text('common.clear')),
                     ),
                   ),
               ],
@@ -599,7 +737,11 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                         child: CircularProgressIndicator(strokeWidth: 2.2),
                       )
                     : const Icon(Icons.image_search_outlined),
-                label: Text(_isSearching ? 'Searching...' : 'Search by Image'),
+                label: Text(
+                  _isSearching
+                      ? l10n.text('common.searching')
+                      : l10n.text('medicineSearch.image.button'),
+                ),
               ),
             ),
         ],
@@ -673,8 +815,8 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
     final isPlaceholder = items.isEmpty;
     final isExpanded = _expandedSectionId == title;
     final canExpand = items.isNotEmpty;
-    final preview = _sectionPreview(items, emptyMessage);
-    final countLabel = _sectionCountLabel(items);
+    final preview = _sectionPreview(context, items, emptyMessage);
+    final countLabel = _sectionCountLabel(context, items);
 
     return Material(
       color: Colors.transparent,
@@ -789,7 +931,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      item,
+                                      context.l10n.isolate(item),
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodyMedium
@@ -823,6 +965,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
 
   Widget _buildResultCard(BuildContext context, MedicineLookupResult result) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     final resolvedDifferentFromQuery =
         result.query.trim().isNotEmpty &&
         result.medicineName.trim().toLowerCase() !=
@@ -847,7 +990,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            result.medicineName,
+            l10n.isolate(result.medicineName),
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -855,14 +998,21 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
           if ((result.genericName ?? '').isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              'Generic name: ${result.genericName}',
+              l10n.format(
+                'medicineSearch.details.genericName',
+                <String, String>{
+                  'name': l10n.isolate(result.genericName ?? ''),
+                },
+              ),
               style: Theme.of(context).textTheme.bodyLarge,
             ),
           ],
           if (resolvedDifferentFromQuery) ...[
             const SizedBox(height: 6),
             Text(
-              'Searched as: ${result.query}',
+              l10n.format('medicineSearch.details.searchedAs', <String, String>{
+                'query': l10n.isolate(result.query),
+              }),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -870,7 +1020,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
           ],
           const SizedBox(height: 10),
           Text(
-            'Tap a section to show more details one by one.',
+            l10n.text('medicineSearch.details.tap'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -886,7 +1036,12 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Text(
-                'Image search note: ${result.identificationReason}',
+                l10n.format(
+                  'medicineSearch.details.photoNote',
+                  <String, String>{
+                    'note': l10n.isolate(result.identificationReason ?? ''),
+                  },
+                ),
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
@@ -895,67 +1050,65 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
           _buildListSection(
             context,
             icon: Icons.local_offer_outlined,
-            title: 'Brand names',
+            title: l10n.text('medicineSearch.section.brandNames'),
             items: result.brandNames,
-            emptyMessage: 'No brand names were found in the public data.',
+            emptyMessage: l10n.text('medicineSearch.empty.brandNames'),
           ),
           const SizedBox(height: 12),
           _buildListSection(
             context,
             icon: Icons.science_outlined,
-            title: 'Active ingredients',
+            title: l10n.text('medicineSearch.section.activeIngredients'),
             items: result.activeIngredients,
-            emptyMessage:
-                'No active ingredients were found in the public data.',
+            emptyMessage: l10n.text('medicineSearch.empty.activeIngredients'),
           ),
           const SizedBox(height: 12),
           _buildListSection(
             context,
             icon: Icons.info_outline,
-            title: 'Used for',
+            title: l10n.text('medicineSearch.section.commonUses'),
             items: result.usedFor,
-            emptyMessage: 'No public label section for uses was found.',
+            emptyMessage: l10n.text('medicineSearch.empty.commonUses'),
           ),
           const SizedBox(height: 12),
           _buildListSection(
             context,
             icon: Icons.straighten_outlined,
-            title: 'Dose',
+            title: l10n.text('medicineSearch.section.doseInformation'),
             items: result.dose,
-            emptyMessage: 'No public dose section was found.',
+            emptyMessage: l10n.text('medicineSearch.empty.doseInformation'),
           ),
           const SizedBox(height: 12),
           _buildListSection(
             context,
             icon: Icons.warning_amber_rounded,
-            title: 'Warnings',
+            title: l10n.text('medicineSearch.section.warnings'),
             items: result.warnings,
-            emptyMessage: 'No public warnings section was found.',
+            emptyMessage: l10n.text('medicineSearch.empty.warnings'),
           ),
           const SizedBox(height: 12),
           _buildListSection(
             context,
             icon: Icons.sick_outlined,
-            title: 'Side effects',
+            title: l10n.text('medicineSearch.section.sideEffects'),
             items: result.sideEffects,
-            emptyMessage: 'No public side-effects section was found.',
+            emptyMessage: l10n.text('medicineSearch.empty.sideEffects'),
           ),
           const SizedBox(height: 12),
           _buildListSection(
             context,
             icon: Icons.inventory_2_outlined,
-            title: 'Storage',
+            title: l10n.text('medicineSearch.section.storage'),
             items: result.storage,
-            emptyMessage: 'No public storage guidance was found.',
+            emptyMessage: l10n.text('medicineSearch.empty.storage'),
           ),
           const SizedBox(height: 12),
           _buildListSection(
             context,
             icon: Icons.gpp_maybe_outlined,
-            title: 'Disclaimer',
+            title: l10n.text('medicineSearch.section.disclaimer'),
             items: result.disclaimer,
-            emptyMessage:
-                'Use a clinician or pharmacist for personal medical advice.',
+            emptyMessage: l10n.text('medicineSearch.empty.disclaimer'),
           ),
         ],
       ),
@@ -963,11 +1116,13 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
   }
 
   Widget _buildResultState(BuildContext context) {
+    final l10n = context.l10n;
+
     if (_errorMessage != null) {
       return _buildStateCard(
         context,
         icon: Icons.error_outline,
-        title: 'Search failed',
+        title: l10n.text('medicineSearch.error.title'),
         message: _errorMessage!,
         accentColor: Theme.of(context).colorScheme.error,
       );
@@ -981,9 +1136,8 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
     return _buildStateCard(
       context,
       icon: Icons.medication_outlined,
-      title: 'Ready to find details',
-      message:
-          'Choose a search method, then search for a medicine to see the details here.',
+      title: l10n.text('medicineSearch.ready.title'),
+      message: l10n.text('medicineSearch.ready.message'),
     );
   }
 
@@ -1001,9 +1155,10 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
   @override
   Widget build(BuildContext context) {
     final hasSelectedMode = _selectedMode != MedicineSearchMode.none;
+    final l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Find Medicine Details')),
+      appBar: AppBar(title: Text(l10n.text('medicineSearch.title'))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(18),
         child: Center(
@@ -1033,8 +1188,8 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                       ),
                       label: Text(
                         _selectedMode == MedicineSearchMode.name
-                            ? 'Use Image Search'
-                            : 'Use Name Search',
+                            ? l10n.text('common.usePhotoSearch')
+                            : l10n.text('common.useNameSearch'),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),

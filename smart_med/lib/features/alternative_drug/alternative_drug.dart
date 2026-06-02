@@ -3,9 +3,14 @@ import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
+import 'package:smart_med/data/medicine/medicine_name_entry.dart';
+import 'package:smart_med/data/medicine/medicine_name_repository.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/features/medicine_search/data/repositories/medicine_lookup_repository.dart';
+import 'package:smart_med/features/medicine_search/data/repositories/medicine_search_history_repository.dart';
 import 'package:smart_med/features/medicine_search/domain/models/medicine_lookup_result.dart';
+import 'package:smart_med/features/medicine_search/presentation/widgets/medicine_name_suggestion_helpers.dart';
 
 enum AlternativeSearchMode { none, name, image }
 
@@ -21,6 +26,9 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
   final TextEditingController _controller = TextEditingController();
   final ImagePicker _imagePicker = ImagePicker();
   final MedicineLookupRepository _repository = medicineLookupRepository;
+  final MedicineSearchHistoryRepository _historyRepository =
+      medicineSearchHistoryRepository;
+  final MedicineNameRepository _medicineNameRepository = medicineNameRepository;
 
   bool _isLoading = false;
   String? _errorMessage;
@@ -35,12 +43,87 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
   bool _isCapturing = false;
   CameraController? _cameraController;
   Future<void>? _initializeCameraFuture;
+  List<String> _recentMedicineSearches = const <String>[];
+  List<MedicineNameEntry> _medicineNameEntries = const <MedicineNameEntry>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onMedicineNameInputChanged);
+    _loadSearchHistory();
+    _loadMedicineNameEntries();
+  }
 
   @override
   void dispose() {
+    _controller.removeListener(_onMedicineNameInputChanged);
     _controller.dispose();
     _cameraController?.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadSearchHistory() async {
+    final history = await _historyRepository.loadHistory();
+
+    if (!mounted) return;
+
+    setState(() {
+      _recentMedicineSearches = history;
+    });
+  }
+
+  void _onMedicineNameInputChanged() {
+    if (!mounted) return;
+
+    setState(() {});
+  }
+
+  Future<void> _loadMedicineNameEntries() async {
+    try {
+      final entries = await _medicineNameRepository.loadEntries();
+
+      if (!mounted) return;
+
+      setState(() {
+        _medicineNameEntries = entries;
+      });
+    } catch (_) {
+      // Suggestions are a helper only. Searching still works if the local list fails.
+    }
+  }
+
+  List<MedicineNameEntry> _filteredMedicineSuggestions() {
+    return filterMedicineNameSuggestions(
+      _medicineNameEntries,
+      _controller.text,
+    );
+  }
+
+  void _applyMedicineSuggestion(MedicineNameEntry entry) {
+    final value = medicineEntrySearchValue(entry);
+
+    setState(() {
+      _controller.text = value;
+      _controller.selection = TextSelection.collapsed(offset: value.length);
+      _errorMessage = null;
+    });
+  }
+
+  Future<void> _saveMedicineSearch(String value) async {
+    final history = await _historyRepository.saveSearch(value);
+
+    if (!mounted) return;
+
+    setState(() {
+      _recentMedicineSearches = history;
+    });
+  }
+
+  void _applyRecentMedicine(String value) {
+    setState(() {
+      _controller.text = value;
+      _errorMessage = null;
+    });
   }
 
   void _selectMode(AlternativeSearchMode mode) {
@@ -65,12 +148,16 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
     final query = _controller.text.trim();
     if (query.isEmpty) {
       setState(() {
-        _errorMessage = 'Please enter a medicine name.';
+        _errorMessage = context.l10n.text('alternative.enterName');
       });
       return;
     }
 
-    await _runSearch(() => _repository.searchByName(query));
+    final result = await _runSearch(() => _repository.searchByName(query));
+
+    if (result != null) {
+      await _saveMedicineSearch(query);
+    }
   }
 
   Future<void> _searchAlternativesByImage() async {
@@ -78,7 +165,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
 
     if (image == null) {
       setState(() {
-        _errorMessage = 'Choose a medicine image before searching.';
+        _errorMessage = context.l10n.text('medicineSearch.choosePhoto');
       });
       return;
     }
@@ -87,7 +174,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
     await _runSearch(() => _repository.searchByImage(image: image));
   }
 
-  Future<void> _runSearch(
+  Future<MedicineLookupResult?> _runSearch(
     Future<MedicineLookupResult> Function() loader,
   ) async {
     setState(() {
@@ -99,26 +186,32 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
     try {
       final result = await loader();
 
-      if (!mounted) return;
+      if (!mounted) return null;
 
       setState(() {
         _result = result;
         _isLoading = false;
       });
+
+      return result;
     } on MedicineLookupRepositoryException catch (e) {
-      if (!mounted) return;
+      if (!mounted) return null;
 
       setState(() {
         _errorMessage = e.message;
         _isLoading = false;
       });
+
+      return null;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return null;
 
       setState(() {
         _errorMessage = e.toString();
         _isLoading = false;
       });
+
+      return null;
     }
   }
 
@@ -158,7 +251,10 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage = 'Failed to open camera: $e';
+        _errorMessage = context.l10n.format(
+          'home.camera.openError',
+          <String, String>{'error': context.l10n.isolate(e.toString())},
+        );
       });
     }
   }
@@ -201,7 +297,10 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
 
       setState(() {
         _isCapturing = false;
-        _errorMessage = 'Failed to capture image: $e';
+        _errorMessage = context.l10n.format(
+          'home.camera.captureError',
+          <String, String>{'error': context.l10n.isolate(e.toString())},
+        );
       });
     }
   }
@@ -241,13 +340,9 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
     });
   }
 
-  void _applyExample(String value) {
-    _controller.text = value;
-    _searchAlternativesByName();
-  }
-
   Widget _buildModeChooser(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -261,14 +356,14 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Find substitute medicines',
+            l10n.text('alternative.mode.title'),
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Choose how you want to search for substitute medicines.',
+            l10n.text('alternative.mode.subtitle'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -279,7 +374,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
             child: ElevatedButton.icon(
               onPressed: () => _selectMode(AlternativeSearchMode.name),
               icon: const Icon(Icons.search),
-              label: const Text('Search by Name'),
+              label: Text(l10n.text('common.useName')),
             ),
           ),
           const SizedBox(height: 12),
@@ -288,7 +383,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
             child: OutlinedButton.icon(
               onPressed: () => _selectMode(AlternativeSearchMode.image),
               icon: const Icon(Icons.image_search_outlined),
-              label: const Text('Search by Image'),
+              label: Text(l10n.text('common.usePhoto')),
             ),
           ),
         ],
@@ -296,8 +391,57 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
     );
   }
 
+  Widget _buildSearchHistoryChips({required bool disabled}) {
+    if (_recentMedicineSearches.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          context.l10n.text('common.recentSearches'),
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _recentMedicineSearches
+              .map((medicine) {
+                return ActionChip(
+                  label: Text(context.l10n.isolate(medicine)),
+                  avatar: const Icon(Icons.history, size: 18),
+                  onPressed: disabled
+                      ? null
+                      : () => _applyRecentMedicine(medicine),
+                );
+              })
+              .toList(growable: false),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMedicineSuggestionsOrHistory({required bool disabled}) {
+    final query = _controller.text.trim();
+
+    if (query.isNotEmpty) {
+      return MedicineNameSuggestionsList(
+        suggestions: _filteredMedicineSuggestions(),
+        onSelected: _applyMedicineSuggestion,
+        disabled: disabled,
+      );
+    }
+
+    return _buildSearchHistoryChips(disabled: disabled);
+  }
+
   Widget _buildNameSearchCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -311,14 +455,14 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Find substitutes by name',
+            l10n.text('alternative.name.title'),
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Enter a medicine name to find possible related substitute medicines.',
+            l10n.text('alternative.name.subtitle'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -328,8 +472,8 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
             controller: _controller,
             textInputAction: TextInputAction.search,
             decoration: InputDecoration(
-              labelText: 'Medicine name',
-              hintText: 'Example: ibuprofen',
+              labelText: l10n.text('common.medicineName'),
+              hintText: l10n.text('common.exampleIbuprofen'),
               prefixIcon: const Icon(Icons.medication_outlined),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
@@ -342,26 +486,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
             },
           ),
           const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              ActionChip(
-                label: const Text('Ibuprofen'),
-                onPressed: _isLoading ? null : () => _applyExample('ibuprofen'),
-              ),
-              ActionChip(
-                label: const Text('Tylenol'),
-                onPressed: _isLoading ? null : () => _applyExample('Tylenol'),
-              ),
-              ActionChip(
-                label: const Text('Amoxicillin'),
-                onPressed: _isLoading
-                    ? null
-                    : () => _applyExample('amoxicillin'),
-              ),
-            ],
-          ),
+          _buildMedicineSuggestionsOrHistory(disabled: _isLoading),
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
@@ -374,7 +499,11 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
                       child: CircularProgressIndicator(strokeWidth: 2.2),
                     )
                   : const Icon(Icons.find_replace_outlined),
-              label: Text(_isLoading ? 'Searching...' : 'Find Substitutes'),
+              label: Text(
+                _isLoading
+                    ? l10n.text('common.searching')
+                    : l10n.text('alternative.name.button'),
+              ),
             ),
           ),
         ],
@@ -384,6 +513,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
 
   Widget _buildImageSearchCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -397,14 +527,14 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Find substitutes by image',
+            l10n.text('alternative.image.title'),
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Take or choose a medicine image. The app reads the medicine, then searches for substitute options.',
+            l10n.text('alternative.image.subtitle'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -443,7 +573,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'No image selected',
+                            l10n.text('common.noImageSelected'),
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: colorScheme.onSurfaceVariant),
                           ),
@@ -465,7 +595,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
                     child: ElevatedButton.icon(
                       onPressed: _isLoading ? null : _openInlineCamera,
                       icon: const Icon(Icons.photo_camera_outlined),
-                      label: const Text('Camera'),
+                      label: Text(l10n.text('common.camera')),
                     ),
                   ),
                 if (!_isCameraOpened && _selectedImageBytes == null)
@@ -474,7 +604,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
                     child: ElevatedButton.icon(
                       onPressed: _isLoading ? null : _pickImage,
                       icon: const Icon(Icons.photo_library_outlined),
-                      label: const Text('Gallery'),
+                      label: Text(l10n.text('common.gallery')),
                     ),
                   ),
                 if (_isCameraOpened)
@@ -483,7 +613,11 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
                     child: ElevatedButton.icon(
                       onPressed: _isCapturing ? null : _captureInlineImage,
                       icon: const Icon(Icons.camera),
-                      label: Text(_isCapturing ? 'Wait...' : 'Capture'),
+                      label: Text(
+                        _isCapturing
+                            ? l10n.text('common.wait')
+                            : l10n.text('common.capture'),
+                      ),
                     ),
                   ),
                 if (_isCameraOpened || _selectedImageBytes != null)
@@ -492,7 +626,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
                     child: OutlinedButton.icon(
                       onPressed: _isLoading ? null : _clearImageOrCamera,
                       icon: const Icon(Icons.close),
-                      label: const Text('Clear'),
+                      label: Text(l10n.text('common.clear')),
                     ),
                   ),
               ],
@@ -511,7 +645,11 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
                         child: CircularProgressIndicator(strokeWidth: 2.2),
                       )
                     : const Icon(Icons.image_search_outlined),
-                label: Text(_isLoading ? 'Searching...' : 'Search by Image'),
+                label: Text(
+                  _isLoading
+                      ? l10n.text('common.searching')
+                      : l10n.text('medicineSearch.image.button'),
+                ),
               ),
             ),
         ],
@@ -532,12 +670,13 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
 
   Widget _buildResultCard(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     if (_errorMessage != null) {
       return _buildInfoCard(
         context,
         icon: Icons.error_outline,
-        title: 'Search failed',
+        title: l10n.text('medicineSearch.error.title'),
         message: _errorMessage!,
         accentColor: colorScheme.error,
       );
@@ -548,9 +687,8 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
       return _buildInfoCard(
         context,
         icon: Icons.find_replace_outlined,
-        title: 'No search yet',
-        message:
-            'Search a medicine to show possible substitute medicines here.',
+        title: l10n.text('alternative.ready.title'),
+        message: l10n.text('alternative.ready.message'),
       );
     }
 
@@ -558,9 +696,10 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
       return _buildInfoCard(
         context,
         icon: Icons.info_outline,
-        title: 'No substitute medicines found',
-        message:
-            'No related alternative medicines were found in the public data checked for ${result.medicineName}.',
+        title: l10n.text('alternative.empty.title'),
+        message: l10n.format('alternative.empty.message', <String, String>{
+          'medicine': l10n.isolate(result.medicineName),
+        }),
       );
     }
 
@@ -576,7 +715,9 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Substitutes for ${result.medicineName}',
+            l10n.format('alternative.result.title', <String, String>{
+              'medicine': l10n.isolate(result.medicineName),
+            }),
             style: Theme.of(
               context,
             ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
@@ -584,7 +725,12 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
           if ((result.genericName ?? '').isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              'Generic name: ${result.genericName}',
+              l10n.format(
+                'medicineSearch.details.genericName',
+                <String, String>{
+                  'name': l10n.isolate(result.genericName ?? ''),
+                },
+              ),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -612,7 +758,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      alternative.displayLabel,
+                      l10n.isolate(alternative.displayLabel),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -624,7 +770,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Important: alternatives are informational only. Ask a doctor or pharmacist before replacing any medication.',
+            l10n.text('alternative.important'),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -686,9 +832,10 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
   @override
   Widget build(BuildContext context) {
     final hasSelectedMode = _selectedMode != AlternativeSearchMode.none;
+    final l10n = context.l10n;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Find Substitute Medicines')),
+      appBar: AppBar(title: Text(l10n.text('alternative.title'))),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(18),
         child: Center(
@@ -715,8 +862,8 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
                       ),
                       label: Text(
                         _selectedMode == AlternativeSearchMode.name
-                            ? 'Use Image Search'
-                            : 'Use Name Search',
+                            ? l10n.text('common.usePhotoSearch')
+                            : l10n.text('common.useNameSearch'),
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),

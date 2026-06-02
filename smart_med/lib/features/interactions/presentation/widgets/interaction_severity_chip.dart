@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 
 class InteractionSeverityChip extends StatelessWidget {
   const InteractionSeverityChip({super.key, required this.severity});
@@ -33,7 +34,7 @@ class InteractionSeverityChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
-          severity,
+          context.l10n.severity(severity),
           textAlign: TextAlign.center,
           softWrap: true,
           style: TextStyle(color: color, fontWeight: FontWeight.bold),

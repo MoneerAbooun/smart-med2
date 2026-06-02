@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/core/firebase/image_storage_repository.dart';
 import 'package:smart_med/core/services/notification_service.dart';
 import 'package:smart_med/features/medications/data/services/medication_image_autofill_service.dart';
@@ -12,6 +13,7 @@ import 'package:smart_med/features/medications/domain/models/medication_record.d
 import 'package:smart_med/features/medications/domain/models/medication_schedule_time.dart';
 import 'package:smart_med/models/local_medicine.dart';
 import 'package:smart_med/services/local_medicine_service.dart';
+import 'package:smart_med/core/widgets/app_snack_bar.dart';
 
 class AddMedicationPage extends StatefulWidget {
   const AddMedicationPage({
@@ -40,6 +42,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   final TextEditingController doseController = TextEditingController();
   final TextEditingController timesPerDayController = TextEditingController();
   final TextEditingController startDateController = TextEditingController();
+  final TextEditingController finishDateController = TextEditingController();
   final TextEditingController noteController = TextEditingController();
   final TextEditingController firstReminderTimeController =
       TextEditingController();
@@ -97,6 +100,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     doseController.dispose();
     timesPerDayController.dispose();
     startDateController.dispose();
+    finishDateController.dispose();
     noteController.dispose();
     firstReminderTimeController.dispose();
 
@@ -148,30 +152,56 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   }
 
   String _reminderIntervalText() {
+    final l10n = context.l10n;
     final intervalMinutes =
         MedicationScheduleTime.intervalMinutesForDailyFrequency(timesPerDay);
     final hours = intervalMinutes ~/ 60;
     final minutes = intervalMinutes % 60;
 
     if (hours == 0) {
-      return '$minutes minute${minutes == 1 ? '' : 's'}';
+      return minutes == 1
+          ? l10n.text('medication.interval.minute')
+          : l10n.format('medication.interval.minutes', <String, String>{
+              'count': minutes.toString(),
+            });
     }
 
     if (minutes == 0) {
-      return '$hours hour${hours == 1 ? '' : 's'}';
+      return hours == 1
+          ? l10n.text('medication.interval.hour')
+          : l10n.format('medication.interval.hours', <String, String>{
+              'count': hours.toString(),
+            });
     }
 
-    return '$hours hour${hours == 1 ? '' : 's'} '
-        '$minutes minute${minutes == 1 ? '' : 's'}';
+    final hourText = hours == 1
+        ? l10n.text('medication.interval.hour')
+        : l10n.format('medication.interval.hours', <String, String>{
+            'count': hours.toString(),
+          });
+    final minuteText = minutes == 1
+        ? l10n.text('medication.interval.minute')
+        : l10n.format('medication.interval.minutes', <String, String>{
+            'count': minutes.toString(),
+          });
+
+    return l10n.format('medication.interval.hourMinute', <String, String>{
+      'hours': hourText,
+      'minutes': minuteText,
+    });
   }
 
   Widget _buildReminderSchedulePreview() {
     final previewTimes = _previewReminderTimes();
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
     final message = previewTimes.isEmpty
-        ? 'After you choose the first reminder time, the app will '
-              'calculate the rest every ${_reminderIntervalText()}.'
-        : 'Calculated reminder times: ${previewTimes.join(', ')}';
+        ? l10n.format('medication.reminderChoose', <String, String>{
+            'interval': l10n.isolate(_reminderIntervalText()),
+          })
+        : l10n.format('medication.reminderTimes', <String, String>{
+            'times': l10n.isolate(previewTimes.join(', ')),
+          });
 
     return Container(
       width: double.infinity,
@@ -250,6 +280,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
   Widget _buildMedicationImageSection() {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -263,14 +294,14 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Medicine Photo',
+            l10n.text('medication.photo.title'),
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
           Text(
-            'Optional. Add a clear pill, bottle, or package photo to auto-fill the medicine name and dose from the local medicine list.',
+            l10n.text('medication.photo.addSubtitle'),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -298,7 +329,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                           ),
                           const SizedBox(height: 10),
                           Text(
-                            'No photo selected',
+                            l10n.text('common.noPhotoSelected'),
                             style: TextStyle(
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -318,15 +349,15 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 icon: const Icon(Icons.photo_library_outlined),
                 label: Text(
                   _selectedMedicationImageBytes == null
-                      ? 'Upload Photo'
-                      : 'Change Photo',
+                      ? l10n.text('common.addPhoto')
+                      : l10n.text('common.changePhoto'),
                 ),
               ),
               if (_selectedMedicationImageBytes != null)
                 OutlinedButton.icon(
                   onPressed: isLoading ? null : _clearMedicationImage,
                   icon: const Icon(Icons.close),
-                  label: const Text('Clear'),
+                  label: Text(l10n.text('common.clear')),
                 ),
             ],
           ),
@@ -342,7 +373,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Reading the photo and matching it to the local medicine list...',
+                    l10n.text('medication.photo.reading'),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -388,10 +419,47 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
     if (pickedDate != null) {
       setState(() {
-        startDateController.text =
-            "${pickedDate.year}-${pickedDate.month.toString().padLeft(2, '0')}-${pickedDate.day.toString().padLeft(2, '0')}";
+        startDateController.text = _formatDateForInput(pickedDate);
+
+        final finishDate = _parseInputDate(finishDateController.text);
+        if (finishDate != null && finishDate.isBefore(pickedDate)) {
+          finishDateController.clear();
+        }
       });
     }
+  }
+
+  Future<void> pickFinishDate() async {
+    final startDate = _parseInputDate(startDateController.text);
+    final currentFinishDate = _parseInputDate(finishDateController.text);
+    final today = DateTime.now();
+    final firstDate = startDate ?? DateTime(2024);
+    DateTime initialDate = currentFinishDate ?? startDate ?? today;
+
+    if (initialDate.isBefore(firstDate)) {
+      initialDate = firstDate;
+    }
+
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: DateTime(2100),
+    );
+
+    if (pickedDate != null) {
+      setState(() {
+        finishDateController.text = _formatDateForInput(pickedDate);
+      });
+    }
+  }
+
+  DateTime? _parseInputDate(String value) {
+    return DateTime.tryParse(value.trim());
+  }
+
+  String _formatDateForInput(DateTime value) {
+    return '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
   }
 
   String? _cleanText(String? value) {
@@ -406,17 +474,20 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   String _displayMedicineName(LocalMedicine medicine) {
     return _cleanText(medicine.brandName) ??
         _cleanText(medicine.genericName) ??
-        'Unknown medicine';
+        context.l10n.text('common.unknownMedicine');
   }
 
   String? _buildMedicineSuggestionSubtitle(LocalMedicine medicine) {
+    final l10n = context.l10n;
     final genericName = _cleanText(medicine.genericName);
     final strength = _cleanText(medicine.strength);
     final form = _cleanText(medicine.form);
     final parts = <String>[
-      if (genericName != null) 'Generic: $genericName',
-      if (strength != null) 'Strength: $strength',
-      if (form != null) 'Form: $form',
+      if (genericName != null)
+        '${l10n.text('common.generic')}: ${l10n.isolate(genericName)}',
+      if (strength != null)
+        '${l10n.text('common.strength')}: ${l10n.isolate(strength)}',
+      if (form != null) '${l10n.text('common.form')}: ${l10n.isolate(form)}',
     ];
 
     if (parts.isEmpty) {
@@ -433,7 +504,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   }) {
     final medicine = selectedMedicine;
     if (medicine == null) {
-      throw StateError('No medicine has been selected.');
+      throw StateError('No medicine selected.');
     }
 
     return MedicationRecord(
@@ -451,7 +522,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       scheduledTimes: times
           .map(MedicationScheduleTime.fromDisplayString)
           .toList(growable: false),
-      startDate: DateTime.tryParse(startDateController.text.trim()),
+      startDate: _parseInputDate(startDateController.text),
+      endDate: _parseInputDate(finishDateController.text),
       notes: noteController.text.trim().isEmpty
           ? null
           : noteController.text.trim(),
@@ -462,23 +534,22 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     );
   }
 
-  void _showMessage(String message) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.hideCurrentSnackBar();
-    messenger.showSnackBar(SnackBar(content: Text(message)));
+  void _showMessage(String message, {AppSnackBarType? type}) {
+    AppSnackBar.show(context, message, type: type);
   }
 
   String _firebaseErrorMessage(
     FirebaseException exception, {
     required String fallbackMessage,
   }) {
+    final l10n = context.l10n;
     switch (exception.code.trim()) {
       case 'permission-denied':
-        return 'You do not have permission to save this medication.';
+        return l10n.text('medication.permissionSave');
       case 'unauthenticated':
-        return 'Please sign in again before saving this medication.';
+        return l10n.text('medication.validation.signInSave');
       case 'unavailable':
-        return 'Firebase is temporarily unavailable. Please try again.';
+        return l10n.text('medication.serviceUnavailable');
       default:
         final message = exception.message?.trim();
         if (message != null && message.isNotEmpty) {
@@ -525,10 +596,10 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         isSearchingMedicines = false;
         _medicineResults = results;
         _medicineSearchFeedback = results.isEmpty
-            ? 'No matches found in the local medicine list.'
+            ? context.l10n.text('medication.noMatch')
             : null;
         _medicineSelectionError = selectedMedicine == null && query.isNotEmpty
-            ? 'Please select a medicine from the list.'
+            ? context.l10n.text('medication.selectFromList')
             : null;
       });
     } catch (_) {
@@ -539,9 +610,12 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       setState(() {
         isSearchingMedicines = false;
         _medicineResults = const <LocalMedicine>[];
-        _medicineSearchFeedback =
-            'Could not search the local medicine list right now.';
-        _medicineSelectionError = 'Please select a medicine from the list.';
+        _medicineSearchFeedback = context.l10n.text(
+          'medication.searchListError',
+        );
+        _medicineSelectionError = context.l10n.text(
+          'medication.selectFromList',
+        );
       });
     }
   }
@@ -648,13 +722,15 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
           if (doseUnits.contains(dosage.unit)) {
             selectedDoseUnit = dosage.unit;
           }
-          _imageAutofillFeedback =
-              'Filled the medicine name and dose from the photo. Please review before saving.';
+          _imageAutofillFeedback = context.l10n.text(
+            'medication.photo.filledNameDose',
+          );
           return;
         }
 
-        _imageAutofillFeedback =
-            'Filled the medicine name from the photo. Please review the dose before saving.';
+        _imageAutofillFeedback = context.l10n.text(
+          'medication.photo.filledName',
+        );
       });
     } on MedicationImageAutofillException catch (error) {
       if (!mounted || _selectedMedicationImage != image) {
@@ -672,8 +748,9 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
       setState(() {
         _isAutofillingMedicationImage = false;
-        _imageAutofillFeedback =
-            'Photo autofill is unavailable right now. You can still enter the details manually.';
+        _imageAutofillFeedback = context.l10n.text(
+          'medication.photo.unavailable',
+        );
       });
     }
   }
@@ -699,6 +776,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
   Widget _buildMedicineSelectionPanel() {
     final medicine = selectedMedicine;
+    final l10n = context.l10n;
 
     if (medicine == null &&
         _medicineResults.isEmpty &&
@@ -726,37 +804,45 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        '${_displayMedicineName(medicine)} selected from local medicines',
+                        '${l10n.isolate(_displayMedicineName(medicine))} ${l10n.text('common.selected')}',
                         style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ),
                     TextButton(
                       onPressed: isLoading ? null : _clearMedicineSelection,
-                      child: const Text('Change'),
+                      child: Text(l10n.text('common.change')),
                     ),
                   ],
                 ),
                 if (_cleanText(medicine.brandName) != null) ...[
                   const SizedBox(height: 8),
-                  Text('Brand: ${medicine.brandName!.trim()}'),
+                  Text(
+                    '${l10n.text('common.brand')}: ${l10n.isolate(medicine.brandName!.trim())}',
+                  ),
                 ],
                 if (_cleanText(medicine.genericName) != null) ...[
                   const SizedBox(height: 8),
-                  Text('Generic: ${medicine.genericName!.trim()}'),
+                  Text(
+                    '${l10n.text('common.generic')}: ${l10n.isolate(medicine.genericName!.trim())}',
+                  ),
                 ],
                 if (medicine.activeIngredients.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
-                    'Active ingredients: ${medicine.activeIngredients.join(', ')}',
+                    '${l10n.text('common.activeIngredients')}: ${l10n.isolate(medicine.activeIngredients.join(', '))}',
                   ),
                 ],
                 if (_cleanText(medicine.strength) != null) ...[
                   const SizedBox(height: 6),
-                  Text('Strength: ${medicine.strength!.trim()}'),
+                  Text(
+                    '${l10n.text('common.strength')}: ${l10n.isolate(medicine.strength!.trim())}',
+                  ),
                 ],
                 if (_cleanText(medicine.form) != null) ...[
                   const SizedBox(height: 6),
-                  Text('Form: ${medicine.form!.trim()}'),
+                  Text(
+                    '${l10n.text('common.form')}: ${l10n.isolate(medicine.form!.trim())}',
+                  ),
                 ],
               ],
             ),
@@ -778,7 +864,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                     ListTile(
                       dense: true,
                       leading: const Icon(Icons.search_outlined),
-                      title: Text(_displayMedicineName(medicine)),
+                      title: Text(l10n.isolate(_displayMedicineName(medicine))),
                       subtitle: subtitle == null ? null : Text(subtitle),
                       trailing: const Icon(
                         Icons.arrow_forward_ios_rounded,
@@ -799,7 +885,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
             nameController.text.trim().isNotEmpty) ...[
           const SizedBox(height: 8),
           Align(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             child: Text(
               _medicineSearchFeedback!,
               style: Theme.of(context).textTheme.bodySmall,
@@ -811,9 +897,10 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   }
 
   Future<void> addMedication() async {
+    final l10n = context.l10n;
     if (selectedMedicine == null) {
       setState(() {
-        _medicineSelectionError = 'Please select a medicine from the list.';
+        _medicineSelectionError = l10n.text('medication.selectFromList');
       });
       return;
     }
@@ -823,7 +910,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     final user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
-      _showMessage('Please sign in before uploading and saving medications.');
+      _showMessage(l10n.text('medication.validation.signInSave'));
       return;
     }
 
@@ -831,10 +918,10 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     try {
       times = _buildReminderTimes();
     } on ArgumentError {
-      _showMessage('Please enter a valid daily frequency.');
+      _showMessage(l10n.text('medication.validation.timesRequired'));
       return;
     } on FormatException {
-      _showMessage('Please select the first reminder time.');
+      _showMessage(l10n.text('medication.validation.firstReminder'));
       return;
     }
 
@@ -873,10 +960,13 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       notificationIds = await NotificationService.scheduleMedicationReminders(
         medicineName: medication.name,
         times: medication.reminderTimes,
-        body: 'Time to take ${medication.name}',
+        body: l10n.format('medication.notificationBody', <String, String>{
+          'medicine': medication.name,
+        }),
         userId: user.uid,
         medicationId: medicationId,
         startDate: medication.startDate,
+        endDate: medication.endDate,
       );
 
       await _medicationRepository.updateMedicationRecord(
@@ -893,16 +983,24 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
       if (!notificationsEnabled) {
         _showMessage(
-          'Medication added successfully. Reminders are off in Settings.',
+          l10n.text('medication.saved.off'),
+          type: AppSnackBarType.success,
         );
-      } else if (notificationIds.length == times.length) {
-        _showMessage('Medication added successfully');
+      } else if (notificationIds.length >= times.length) {
+        _showMessage(
+          l10n.text('medication.saved'),
+          type: AppSnackBarType.success,
+        );
       } else if (notificationIds.isNotEmpty) {
         _showMessage(
-          'Medication added, but some reminders could not be scheduled.',
+          l10n.text('medication.saved.partial'),
+          type: AppSnackBarType.warning,
         );
       } else {
-        _showMessage('Medication added, but reminders could not be scheduled.');
+        _showMessage(
+          l10n.text('medication.saved.noReminders'),
+          type: AppSnackBarType.warning,
+        );
       }
 
       Navigator.pop(context, true);
@@ -916,13 +1014,17 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       _showMessage(
         _firebaseErrorMessage(
           e,
-          fallbackMessage: 'Could not save the medication right now.',
+          fallbackMessage: l10n.text('medication.saveError'),
         ),
       );
     } catch (e) {
       if (!mounted) return;
 
-      _showMessage('Could not save the medication. ${e.toString()}');
+      _showMessage(
+        l10n.format('medication.saveErrorDetail', <String, String>{
+          'error': l10n.isolate(e.toString()),
+        }),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -934,8 +1036,13 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Medication'), centerTitle: true),
+      appBar: AppBar(
+        title: Text(l10n.text('medication.add.title')),
+        centerTitle: true,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -945,11 +1052,12 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
               children: [
                 TextFormField(
                   controller: nameController,
-                  decoration: customInputDecoration('Medication Name *')
-                      .copyWith(
+                  decoration:
+                      customInputDecoration(
+                        l10n.text('medication.nameRequired'),
+                      ).copyWith(
                         suffixIcon: _buildNameSuffixIcon(),
-                        helperText:
-                            'Search and select from the local medicine list.',
+                        helperText: l10n.text('medication.nameHelper'),
                         errorText: _medicineSelectionError,
                       ),
                   textInputAction: TextInputAction.search,
@@ -966,15 +1074,17 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
-                  decoration: customInputDecoration('Dosage *'),
+                  decoration: customInputDecoration(
+                    l10n.text('medication.doseAmountRequired'),
+                  ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Please enter dosage';
+                      return l10n.text('medication.validation.doseRequired');
                     }
 
                     final number = double.tryParse(value.trim());
                     if (number == null || number <= 0) {
-                      return 'Enter a valid dosage number';
+                      return l10n.text('medication.validation.validDose');
                     }
 
                     return null;
@@ -985,7 +1095,9 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 DropdownButtonFormField<String>(
                   key: ValueKey<String>('dose-unit-$selectedDoseUnit'),
                   initialValue: selectedDoseUnit,
-                  decoration: customInputDecoration('Dose Unit *'),
+                  decoration: customInputDecoration(
+                    l10n.text('medication.doseUnitRequired'),
+                  ),
                   items: doseUnits.map((unit) {
                     return DropdownMenuItem<String>(
                       value: unit,
@@ -1006,20 +1118,20 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   controller: timesPerDayController,
                   keyboardType: TextInputType.number,
                   decoration: customInputDecoration(
-                    'Frequency per day (1-6) *',
+                    l10n.text('medication.timesPerDayRequired'),
                   ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Please enter the daily frequency';
+                      return l10n.text('medication.validation.timesRequired');
                     }
 
                     final number = int.tryParse(value.trim());
                     if (number == null) {
-                      return 'Enter a valid number';
+                      return l10n.text('medication.validation.enterNumber');
                     }
 
                     if (number < 1 || number > 6) {
-                      return 'Times per day must be between 1 and 6';
+                      return l10n.text('medication.validation.timesRange');
                     }
 
                     return null;
@@ -1042,10 +1154,10 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                             const TextPosition(offset: 1),
                           );
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Maximum is 6 times per day'),
-                        ),
+                      AppSnackBar.show(
+                        context,
+                        l10n.text('medication.validation.maxTimes'),
+                        type: AppSnackBarType.warning,
                       );
                     }
 
@@ -1064,15 +1176,16 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   controller: firstReminderTimeController,
                   readOnly: true,
                   onTap: _pickFirstReminderTime,
-                  decoration: customInputDecoration('First Reminder Time *')
-                      .copyWith(
-                        helperText:
-                            'The app will calculate the remaining reminders automatically.',
+                  decoration:
+                      customInputDecoration(
+                        l10n.text('medication.firstReminderRequired'),
+                      ).copyWith(
+                        helperText: l10n.text('medication.reminderHelper'),
                         suffixIcon: const Icon(Icons.access_time),
                       ),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Please select the first reminder time';
+                      return l10n.text('medication.validation.firstReminder');
                     }
                     return null;
                   },
@@ -1086,12 +1199,57 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                   readOnly: true,
                   onTap: pickStartDate,
                   decoration: customInputDecoration(
-                    'Start Date *',
+                    l10n.text('medication.startDateRequired'),
                   ).copyWith(suffixIcon: const Icon(Icons.calendar_today)),
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Please choose start date';
+                      return l10n.text('medication.validation.startDate');
                     }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 14),
+
+                TextFormField(
+                  controller: finishDateController,
+                  readOnly: true,
+                  onTap: pickFinishDate,
+                  decoration:
+                      customInputDecoration(
+                        l10n.text('medication.finishDate'),
+                      ).copyWith(
+                        helperText: l10n.text('medication.finishDateHelper'),
+                        suffixIcon: finishDateController.text.trim().isEmpty
+                            ? const Icon(Icons.calendar_today)
+                            : IconButton(
+                                icon: const Icon(Icons.clear),
+                                tooltip: l10n.text(
+                                  'medication.clearFinishDate',
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    finishDateController.clear();
+                                  });
+                                },
+                              ),
+                      ),
+                  validator: (value) {
+                    final finishDate = _parseInputDate(value ?? '');
+                    if ((value ?? '').trim().isEmpty) {
+                      return null;
+                    }
+
+                    if (finishDate == null) {
+                      return l10n.text('medication.validation.finishDate');
+                    }
+
+                    final startDate = _parseInputDate(startDateController.text);
+                    if (startDate != null && finishDate.isBefore(startDate)) {
+                      return l10n.text(
+                        'medication.validation.finishBeforeStart',
+                      );
+                    }
+
                     return null;
                   },
                 ),
@@ -1100,7 +1258,9 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 TextFormField(
                   controller: noteController,
                   maxLines: 4,
-                  decoration: customInputDecoration('Notes'),
+                  decoration: customInputDecoration(
+                    l10n.text('medication.notes'),
+                  ),
                 ),
                 const SizedBox(height: 24),
 
@@ -1120,7 +1280,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                             width: 22,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Add Medication'),
+                        : Text(l10n.text('common.addMedicine')),
                   ),
                 ),
               ],

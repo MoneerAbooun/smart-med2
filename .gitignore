@@ -1,28 +1,39 @@
-# Archives and generated caches
+# Archives / backups
 *.zip
-__pycache__/
-*.py[cod]
+*.rar
+*.7z
 
-# Local Python environments
-.venv/
-venv/
-env/
+# Firebase / secrets
+*firebase-adminsdk*.json
+serviceAccountKey.json
+.env
+*.env
+*.pem
+*.key
 
-# Flutter/Dart generated output
-**/.dart_tool/
-**/build/
-**/coverage/
-**/.flutter-plugins-dependencies
+# Flutter
+smart_med/build/
+smart_med/.dart_tool/
+smart_med/.flutter-plugins
+smart_med/.flutter-plugins-dependencies
 
-# Local uploaded media
-smart_med_api/uploads/
+# Python / FastAPI
+smart_med_api/.venv/
+smart_med_api/venv/
+smart_med_api/__pycache__/
+smart_med_api/**/__pycache__/
+smart_med_api/.pytest_cache/
 
-# IDE and OS files
+# App / tool local data
+.appdata/
+.tmp_appdata/
+.dart_telemetry/
+.codex_backup/
+
+# IDE
+.vscode/
 .idea/
-*.iml
+
+# OS
 .DS_Store
 Thumbs.db
-
-
-
-smartmed-20c2a-firebase-adminsdk-fbsvc-5445071c85.json
