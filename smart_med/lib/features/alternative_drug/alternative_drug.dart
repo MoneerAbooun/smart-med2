@@ -7,9 +7,11 @@ import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/data/medicine/medicine_name_entry.dart';
 import 'package:smart_med/data/medicine/medicine_name_repository.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
+import 'package:smart_med/features/alternative_drug/alternative_result_filter.dart';
 import 'package:smart_med/features/medicine_search/data/repositories/medicine_lookup_repository.dart';
 import 'package:smart_med/features/medicine_search/data/repositories/medicine_search_history_repository.dart';
 import 'package:smart_med/features/medicine_search/domain/models/medicine_lookup_result.dart';
+import 'package:smart_med/features/medicine_search/presentation/medicine_result_localization.dart';
 import 'package:smart_med/features/medicine_search/presentation/widgets/medicine_name_suggestion_helpers.dart';
 
 enum AlternativeSearchMode { none, name, image }
@@ -185,15 +187,16 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
 
     try {
       final result = await loader();
+      final filteredResult = removeSameMedicineAlternatives(result);
 
       if (!mounted) return null;
 
       setState(() {
-        _result = result;
+        _result = filteredResult;
         _isLoading = false;
       });
 
-      return result;
+      return filteredResult;
     } on MedicineLookupRepositoryException catch (e) {
       if (!mounted) return null;
 
@@ -677,7 +680,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
         context,
         icon: Icons.error_outline,
         title: l10n.text('medicineSearch.error.title'),
-        message: _errorMessage!,
+        message: l10n.medicineResultText(_errorMessage!),
         accentColor: colorScheme.error,
       );
     }
@@ -758,7 +761,7 @@ class _AlternativeDrugSearchPageState extends State<AlternativeDrugSearchPage> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      l10n.isolate(alternative.displayLabel),
+                      l10n.medicineAlternativeLabel(alternative.displayLabel),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),

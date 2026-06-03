@@ -7,10 +7,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/core/firebase/image_storage_repository.dart';
 import 'package:smart_med/core/services/notification_service.dart';
+import 'package:smart_med/features/interactions/presentation/interaction_result_localization.dart';
 import 'package:smart_med/features/medications/data/services/medication_image_autofill_service.dart';
 import 'package:smart_med/features/medications/data/repositories/medication_repository.dart';
+import 'package:smart_med/features/medications/data/services/medication_safety_assessment_service.dart';
 import 'package:smart_med/features/medications/domain/models/medication_record.dart';
 import 'package:smart_med/features/medications/domain/models/medication_schedule_time.dart';
+import 'package:smart_med/features/medications/domain/models/medication_safety_assessment.dart';
+import 'package:smart_med/features/medicine_search/presentation/medicine_result_localization.dart';
 import 'package:smart_med/models/local_medicine.dart';
 import 'package:smart_med/services/local_medicine_service.dart';
 import 'package:smart_med/core/widgets/app_snack_bar.dart';
@@ -37,6 +41,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   final ImageStorageRepository _imageStorageRepository = imageStorageRepository;
   final MedicationImageAutofillService _medicationImageAutofillService =
       medicationImageAutofillService;
+  final MedicationSafetyAssessmentService _safetyAssessmentService =
+      medicationSafetyAssessmentService;
 
   final TextEditingController nameController = TextEditingController();
   final TextEditingController doseController = TextEditingController();
@@ -50,16 +56,20 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
   bool isLoading = false;
   bool isSearchingMedicines = false;
+  bool _isCheckingSafety = false;
   bool _isAutofillingMedicationImage = false;
   int timesPerDay = 1;
   Timer? _medicineSearchDebounce;
   List<LocalMedicine> _medicineResults = const <LocalMedicine>[];
   LocalMedicine? selectedMedicine;
+  MedicationSafetyAssessment? _safetyAssessment;
   String? _medicineSearchFeedback;
   String? _medicineSelectionError;
+  String? _safetyAssessmentError;
   String? _imageAutofillFeedback;
   XFile? _selectedMedicationImage;
   Uint8List? _selectedMedicationImageBytes;
+  int _safetyAssessmentRequest = 0;
 
   String selectedDoseUnit = 'mg';
   final List<String> doseUnits = [
@@ -497,15 +507,92 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     return parts.join(' | ');
   }
 
+  void _resetSafetyAssessmentState() {
+    _safetyAssessmentRequest++;
+    _isCheckingSafety = false;
+    _safetyAssessment = null;
+    _safetyAssessmentError = null;
+  }
+
+  Future<MedicationSafetyAssessment?> _runSafetyAssessment(
+    LocalMedicine medicine, {
+    required String uid,
+  }) async {
+    final requestId = ++_safetyAssessmentRequest;
+
+    setState(() {
+      _isCheckingSafety = true;
+      _safetyAssessment = null;
+      _safetyAssessmentError = null;
+    });
+
+    try {
+      final assessment = await _safetyAssessmentService.assessMedicine(
+        uid: uid,
+        medicine: medicine,
+      );
+
+      if (!mounted || requestId != _safetyAssessmentRequest) {
+        return null;
+      }
+
+      setState(() {
+        _isCheckingSafety = false;
+        _safetyAssessment = assessment;
+        _safetyAssessmentError = null;
+      });
+
+      return assessment;
+    } catch (_) {
+      if (!mounted || requestId != _safetyAssessmentRequest) {
+        return null;
+      }
+
+      setState(() {
+        _isCheckingSafety = false;
+        _safetyAssessment = null;
+        _safetyAssessmentError = context.l10n.text('medication.safety.error');
+      });
+
+      return null;
+    }
+  }
+
+  Future<void> _refreshSafetyAssessment(LocalMedicine medicine) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    await _runSafetyAssessment(medicine, uid: user.uid);
+  }
+
+  Future<MedicationSafetyAssessment?> _ensureSafetyAssessment({
+    required String uid,
+    required LocalMedicine medicine,
+  }) async {
+    final existing = _safetyAssessment;
+    if (existing != null &&
+        existing.medicineKey == medicationSafetyKey(medicine) &&
+        !_isCheckingSafety) {
+      return existing;
+    }
+
+    return _runSafetyAssessment(medicine, uid: uid);
+  }
+
   MedicationRecord _buildMedicationRecord(
     String uid,
     List<String> times, {
     String? imageUrl,
+    MedicationSafetyAssessment? acknowledgedSafetyAssessment,
   }) {
     final medicine = selectedMedicine;
     if (medicine == null) {
       throw StateError('No medicine selected.');
     }
+    final acknowledgedSafetyWarningCount =
+        acknowledgedSafetyAssessment?.signals.length ?? 0;
 
     return MedicationRecord(
       userId: uid,
@@ -530,6 +617,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       imageUrl: imageUrl,
       remindersEnabled: true,
       status: 'active',
+      safetyWarningsAcknowledged: acknowledgedSafetyWarningCount > 0,
+      safetyWarningCount: acknowledgedSafetyWarningCount,
       notificationIds: const <int>[],
     );
   }
@@ -630,6 +719,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       _medicineSearchDebounce?.cancel();
       setState(() {
         selectedMedicine = null;
+        _resetSafetyAssessmentState();
         isSearchingMedicines = false;
         _medicineResults = const <LocalMedicine>[];
         _medicineSearchFeedback = null;
@@ -651,6 +741,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     if (selectedMedicine != null) {
       setState(() {
         selectedMedicine = null;
+        _resetSafetyAssessmentState();
       });
     }
 
@@ -677,6 +768,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
       _medicineSelectionError = null;
       isSearchingMedicines = false;
     });
+
+    unawaited(_refreshSafetyAssessment(medicine));
   }
 
   void _selectMedicine(LocalMedicine medicine) {
@@ -690,6 +783,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
 
     setState(() {
       selectedMedicine = null;
+      _resetSafetyAssessmentState();
       _medicineResults = const <LocalMedicine>[];
       _medicineSearchFeedback = null;
       _medicineSelectionError = null;
@@ -896,6 +990,364 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     );
   }
 
+  Widget _buildSafetyAssessmentPanel() {
+    final medicine = selectedMedicine;
+    if (medicine == null) {
+      return const SizedBox.shrink();
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
+    final assessment = _safetyAssessment;
+    final hasSignals = assessment?.hasSignals ?? false;
+    final hasNotes = assessment?.notes.isNotEmpty ?? false;
+    final hasError = _safetyAssessmentError != null;
+    final backgroundColor = hasSignals
+        ? colorScheme.errorContainer
+        : colorScheme.surfaceContainerHighest;
+    final foregroundColor = hasSignals
+        ? colorScheme.onErrorContainer
+        : colorScheme.onSurfaceVariant;
+    final icon = hasSignals
+        ? Icons.warning_amber_rounded
+        : hasError
+        ? Icons.info_outline
+        : Icons.verified_user_outlined;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: hasSignals ? colorScheme.error : colorScheme.outlineVariant,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: foregroundColor),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  l10n.text('medication.safety.title'),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: foregroundColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              if (hasError)
+                TextButton(
+                  onPressed: isLoading
+                      ? null
+                      : () => unawaited(_refreshSafetyAssessment(medicine)),
+                  child: Text(l10n.text('common.retry')),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (_isCheckingSafety) ...[
+            const LinearProgressIndicator(),
+            const SizedBox(height: 10),
+            Text(
+              l10n.text('medication.safety.checking'),
+              style: TextStyle(color: foregroundColor),
+            ),
+          ] else if (hasError) ...[
+            Text(
+              _safetyAssessmentError!,
+              style: TextStyle(color: foregroundColor),
+            ),
+          ] else if (assessment == null) ...[
+            Text(
+              l10n.text('medication.safety.pending'),
+              style: TextStyle(color: foregroundColor),
+            ),
+          ] else if (hasSignals) ...[
+            Text(
+              l10n.text('medication.safety.signalsFound'),
+              style: TextStyle(color: foregroundColor),
+            ),
+            const SizedBox(height: 10),
+            _buildSafetySignalList(assessment, dense: true),
+          ] else if (hasNotes) ...[
+            Text(
+              l10n.text('medication.safety.limited'),
+              style: TextStyle(color: foregroundColor),
+            ),
+          ] else ...[
+            Text(
+              l10n.text('medication.safety.noSignals'),
+              style: TextStyle(color: foregroundColor),
+            ),
+          ],
+          if (assessment != null && assessment.notes.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            ...assessment.notes
+                .take(2)
+                .map(
+                  (note) => Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 16,
+                          color: foregroundColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _localizedSafetyNote(note, assessment),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: foregroundColor),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSafetySignalList(
+    MedicationSafetyAssessment assessment, {
+    required bool dense,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      children: assessment.signals
+          .map((signal) {
+            final evidence = signal.evidence.take(dense ? 1 : 2).toList();
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: dense ? 8 : 12),
+              child: Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(dense ? 10 : 12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: colorScheme.outlineVariant),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          _safetySignalIcon(signal.type),
+                          size: 18,
+                          color: colorScheme.error,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${context.l10n.severity(signal.severity)}: ${_localizedSafetySignalTitle(signal)}',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(_localizedSafetySignalDetail(signal, assessment)),
+                    if (evidence.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      ...evidence.map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            _localizedSafetyEvidence(signal, item),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: colorScheme.onSurfaceVariant),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            );
+          })
+          .toList(growable: false),
+    );
+  }
+
+  String _localizedSafetySignalTitle(MedicationSafetySignal signal) {
+    final key = switch (signal.type) {
+      MedicationSafetySignalType.directAllergy =>
+        'medication.safety.signal.directAllergy.title',
+      MedicationSafetySignalType.allergyInteraction =>
+        'medication.safety.signal.allergyInteraction.title',
+      MedicationSafetySignalType.allergyWarning =>
+        'medication.safety.signal.allergyWarning.title',
+      MedicationSafetySignalType.chronicConditionWarning =>
+        'medication.safety.signal.conditionWarning.title',
+    };
+
+    return context.l10n.text(key);
+  }
+
+  String _localizedSafetySignalDetail(
+    MedicationSafetySignal signal,
+    MedicationSafetyAssessment assessment,
+  ) {
+    final l10n = context.l10n;
+    final profileItem = signal.matchedProfileItem ?? '';
+    final values = <String, String>{
+      'medicine': l10n.isolate(assessment.medicineName),
+      'allergy': l10n.isolate(profileItem),
+      'condition': l10n.isolate(profileItem),
+      'summary': l10n.interactionResultText(signal.sourceSummary ?? ''),
+    };
+
+    final key = switch (signal.type) {
+      MedicationSafetySignalType.directAllergy =>
+        'medication.safety.signal.directAllergy.detail',
+      MedicationSafetySignalType.allergyInteraction =>
+        'medication.safety.signal.allergyInteraction.detail',
+      MedicationSafetySignalType.allergyWarning =>
+        'medication.safety.signal.allergyWarning.detail',
+      MedicationSafetySignalType.chronicConditionWarning =>
+        'medication.safety.signal.conditionWarning.detail',
+    };
+
+    final detail = l10n.format(key, values);
+    if (detail != key) {
+      return detail;
+    }
+
+    return l10n.isArabic ? l10n.isolate(signal.detail) : signal.detail;
+  }
+
+  String _localizedSafetyEvidence(
+    MedicationSafetySignal signal,
+    String evidence,
+  ) {
+    final l10n = context.l10n;
+
+    switch (signal.type) {
+      case MedicationSafetySignalType.allergyInteraction:
+        return l10n.interactionResultText(evidence);
+      case MedicationSafetySignalType.directAllergy:
+      case MedicationSafetySignalType.allergyWarning:
+      case MedicationSafetySignalType.chronicConditionWarning:
+        return l10n.medicineResultText(
+          evidence,
+          section: MedicineResultSection.warnings,
+        );
+    }
+  }
+
+  String _localizedSafetyNote(
+    String note,
+    MedicationSafetyAssessment assessment,
+  ) {
+    final l10n = context.l10n;
+    if (!l10n.isArabic) {
+      return note;
+    }
+
+    if (note == 'We could not find your safety profile for this check.') {
+      return l10n.text('medication.safety.note.profileMissing');
+    }
+
+    const labelPrefix = 'Public medicine label warnings could not be checked: ';
+    if (note.startsWith(labelPrefix)) {
+      return l10n.format('medication.safety.note.labelUnavailable', {
+        'error': l10n.medicineResultText(note.substring(labelPrefix.length)),
+      });
+    }
+
+    final compareMatch = RegExp(
+      r'^Could not compare (.+) with allergy "(.+)"(?:: (.+))?\.?$',
+    ).firstMatch(note);
+    if (compareMatch != null) {
+      final error = compareMatch.group(3);
+      if (error == null || error.trim().isEmpty) {
+        return l10n.format('medication.safety.note.compareUnavailable', {
+          'medicine': l10n.isolate(compareMatch.group(1)!),
+          'allergy': l10n.isolate(compareMatch.group(2)!),
+        });
+      }
+
+      return l10n.format('medication.safety.note.compareUnavailableDetail', {
+        'medicine': l10n.isolate(compareMatch.group(1)!),
+        'allergy': l10n.isolate(compareMatch.group(2)!),
+        'error': l10n.interactionResultText(error),
+      });
+    }
+
+    return l10n.isolate(note);
+  }
+
+  IconData _safetySignalIcon(MedicationSafetySignalType type) {
+    switch (type) {
+      case MedicationSafetySignalType.directAllergy:
+      case MedicationSafetySignalType.allergyWarning:
+        return Icons.warning_amber_rounded;
+      case MedicationSafetySignalType.allergyInteraction:
+        return Icons.sync_alt_rounded;
+      case MedicationSafetySignalType.chronicConditionWarning:
+        return Icons.health_and_safety_outlined;
+    }
+  }
+
+  Future<bool> _confirmSafetyAssessment(
+    MedicationSafetyAssessment assessment,
+  ) async {
+    final l10n = context.l10n;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(l10n.text('medication.safety.confirmTitle')),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    l10n.format('medication.safety.confirmMessage', {
+                      'medicine': l10n.isolate(assessment.medicineName),
+                    }),
+                  ),
+                  const SizedBox(height: 14),
+                  _buildSafetySignalList(assessment, dense: false),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(l10n.text('common.cancel')),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(l10n.text('medication.safety.addAnyway')),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
   Future<void> addMedication() async {
     final l10n = context.l10n;
     if (selectedMedicine == null) {
@@ -912,6 +1364,38 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
     if (user == null) {
       _showMessage(l10n.text('medication.validation.signInSave'));
       return;
+    }
+
+    if (_isCheckingSafety) {
+      _showMessage(
+        l10n.text('medication.safety.wait'),
+        type: AppSnackBarType.warning,
+      );
+      return;
+    }
+
+    final safetyAssessment = await _ensureSafetyAssessment(
+      uid: user.uid,
+      medicine: selectedMedicine!,
+    );
+
+    if (!mounted) return;
+
+    if (safetyAssessment == null) {
+      _showMessage(
+        l10n.text('medication.safety.error'),
+        type: AppSnackBarType.warning,
+      );
+      return;
+    }
+
+    MedicationSafetyAssessment? acknowledgedSafetyAssessment;
+    if (safetyAssessment.needsConfirmation) {
+      final confirmed = await _confirmSafetyAssessment(safetyAssessment);
+      if (!mounted || !confirmed) {
+        return;
+      }
+      acknowledgedSafetyAssessment = safetyAssessment;
     }
 
     final List<String> times;
@@ -945,6 +1429,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         user.uid,
         times,
         imageUrl: imageUrl,
+        acknowledgedSafetyAssessment: acknowledgedSafetyAssessment,
       );
 
       await _medicationRepository.saveMedicationRecord(
@@ -1065,6 +1550,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                 ),
                 const SizedBox(height: 10),
                 _buildMedicineSelectionPanel(),
+                const SizedBox(height: 10),
+                _buildSafetyAssessmentPanel(),
                 const SizedBox(height: 14),
                 _buildMedicationImageSection(),
                 const SizedBox(height: 14),
@@ -1271,6 +1758,7 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                     onPressed:
                         isLoading ||
                             _isAutofillingMedicationImage ||
+                            _isCheckingSafety ||
                             selectedMedicine == null
                         ? null
                         : addMedication,
@@ -1280,7 +1768,11 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
                             width: 22,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text(l10n.text('common.addMedicine')),
+                        : Text(
+                            _isCheckingSafety
+                                ? l10n.text('common.checking')
+                                : l10n.text('common.addMedicine'),
+                          ),
                   ),
                 ),
               ],

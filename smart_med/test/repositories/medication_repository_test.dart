@@ -43,86 +43,131 @@ void main() {
       expect(snapshot.data()!['updatedAt'], isNotNull);
     });
 
-    test('fetchMedicationRecord returns null when the document is missing', () async {
-      final record = await repository.fetchMedicationRecord(
-        uid: uid,
-        medicationId: 'missing-id',
+    test(
+      'fetchMedicationRecord returns null when the document is missing',
+      () async {
+        final record = await repository.fetchMedicationRecord(
+          uid: uid,
+          medicationId: 'missing-id',
+        );
+
+        expect(record, isNull);
+      },
+    );
+
+    test('round-trips acknowledged safety warning fields', () async {
+      final medication = _buildMedication(
+        userId: uid,
+        name: 'Trofin',
+        safetyWarningsAcknowledged: true,
+        safetyWarningCount: 2,
       );
 
-      expect(record, isNull);
-    });
-
-    test('updateMedication keeps createdAt and updates changed fields', () async {
-      const medicationId = 'med-001';
-      final createdAt = DateTime.utc(2026, 3, 15, 9, 30);
-
-      await FirestorePaths.medicationDoc(firestore, uid, medicationId).set({
-        ..._buildMedication(
-          id: medicationId,
-          userId: uid,
-          name: 'Vitamin C',
-          createdAt: createdAt,
-          updatedAt: createdAt,
-        ).toMap(),
-        'userId': uid,
-        'createdAt': createdAt,
-        'updatedAt': createdAt,
-      });
-
-      await repository.updateMedication(
+      final medicationId = await repository.createMedication(
         uid: uid,
-        medicationId: medicationId,
-        data: {
-          'name': 'Vitamin C 1000',
-          'doseAmount': 1000,
-          'doseUnit': 'mg',
-          'notes': 'Take after breakfast',
-        },
+        medication: medication,
       );
 
-      final updated = await repository.fetchMedicationRecord(
+      final saved = await repository.fetchMedicationRecord(
         uid: uid,
         medicationId: medicationId,
       );
+      final snapshot = await FirestorePaths.medicationDoc(
+        firestore,
+        uid,
+        medicationId,
+      ).get();
 
-      expect(updated, isNotNull);
-      expect(updated!.name, 'Vitamin C 1000');
-      expect(updated.doseAmount, 1000);
-      expect(updated.doseUnit, 'mg');
-      expect(updated.notes, 'Take after breakfast');
-      expect(updated.createdAt, isNotNull);
-      expect(updated.createdAt!.isAtSameMomentAs(createdAt), isTrue);
-      expect(updated.updatedAt, isNotNull);
-      expect(updated.updatedAt!.isAfter(createdAt), isTrue);
+      expect(saved, isNotNull);
+      expect(saved!.safetyWarningsAcknowledged, isTrue);
+      expect(saved.safetyWarningCount, 2);
+      expect(snapshot.data()!['safetyWarningsAcknowledged'], isTrue);
+      expect(snapshot.data()!['safetyWarningCount'], 2);
     });
 
-    test('watchMedicationRecords sorts results by createdAt descending', () async {
-      await FirestorePaths.medicationsCollection(firestore, uid).doc('older').set({
-        ..._buildMedication(
-          id: 'older',
-          userId: uid,
-          name: 'Older',
-          createdAt: DateTime.utc(2026, 1, 1, 8),
-        ).toMap(),
-        'createdAt': DateTime.utc(2026, 1, 1, 8),
-        'updatedAt': DateTime.utc(2026, 1, 1, 8),
-      });
+    test(
+      'updateMedication keeps createdAt and updates changed fields',
+      () async {
+        const medicationId = 'med-001';
+        final createdAt = DateTime.utc(2026, 3, 15, 9, 30);
 
-      await FirestorePaths.medicationsCollection(firestore, uid).doc('newer').set({
-        ..._buildMedication(
-          id: 'newer',
-          userId: uid,
-          name: 'Newer',
-          createdAt: DateTime.utc(2026, 2, 1, 8),
-        ).toMap(),
-        'createdAt': DateTime.utc(2026, 2, 1, 8),
-        'updatedAt': DateTime.utc(2026, 2, 1, 8),
-      });
+        await FirestorePaths.medicationDoc(firestore, uid, medicationId).set({
+          ..._buildMedication(
+            id: medicationId,
+            userId: uid,
+            name: 'Vitamin C',
+            createdAt: createdAt,
+            updatedAt: createdAt,
+          ).toMap(),
+          'userId': uid,
+          'createdAt': createdAt,
+          'updatedAt': createdAt,
+        });
 
-      final records = await repository.watchMedicationRecords(uid: uid).first;
+        await repository.updateMedication(
+          uid: uid,
+          medicationId: medicationId,
+          data: {
+            'name': 'Vitamin C 1000',
+            'doseAmount': 1000,
+            'doseUnit': 'mg',
+            'notes': 'Take after breakfast',
+          },
+        );
 
-      expect(records.map((record) => record.id), ['newer', 'older']);
-    });
+        final updated = await repository.fetchMedicationRecord(
+          uid: uid,
+          medicationId: medicationId,
+        );
+
+        expect(updated, isNotNull);
+        expect(updated!.name, 'Vitamin C 1000');
+        expect(updated.doseAmount, 1000);
+        expect(updated.doseUnit, 'mg');
+        expect(updated.notes, 'Take after breakfast');
+        expect(updated.createdAt, isNotNull);
+        expect(updated.createdAt!.isAtSameMomentAs(createdAt), isTrue);
+        expect(updated.updatedAt, isNotNull);
+        expect(updated.updatedAt!.isAfter(createdAt), isTrue);
+      },
+    );
+
+    test(
+      'watchMedicationRecords sorts results by createdAt descending',
+      () async {
+        await FirestorePaths.medicationsCollection(
+          firestore,
+          uid,
+        ).doc('older').set({
+          ..._buildMedication(
+            id: 'older',
+            userId: uid,
+            name: 'Older',
+            createdAt: DateTime.utc(2026, 1, 1, 8),
+          ).toMap(),
+          'createdAt': DateTime.utc(2026, 1, 1, 8),
+          'updatedAt': DateTime.utc(2026, 1, 1, 8),
+        });
+
+        await FirestorePaths.medicationsCollection(
+          firestore,
+          uid,
+        ).doc('newer').set({
+          ..._buildMedication(
+            id: 'newer',
+            userId: uid,
+            name: 'Newer',
+            createdAt: DateTime.utc(2026, 2, 1, 8),
+          ).toMap(),
+          'createdAt': DateTime.utc(2026, 2, 1, 8),
+          'updatedAt': DateTime.utc(2026, 2, 1, 8),
+        });
+
+        final records = await repository.watchMedicationRecords(uid: uid).first;
+
+        expect(records.map((record) => record.id), ['newer', 'older']);
+      },
+    );
 
     test('deleteMedication removes the stored document', () async {
       const medicationId = 'med-delete';
@@ -148,6 +193,8 @@ MedicationRecord _buildMedication({
   String? id,
   required String userId,
   String name = 'Sample Medication',
+  bool safetyWarningsAcknowledged = false,
+  int safetyWarningCount = 0,
   DateTime? createdAt,
   DateTime? updatedAt,
 }) {
@@ -158,11 +205,11 @@ MedicationRecord _buildMedication({
     doseAmount: 200,
     doseUnit: 'mg',
     frequencyPerDay: 1,
-    scheduledTimes: const [
-      MedicationScheduleTime(hour: 8, minute: 0),
-    ],
+    scheduledTimes: const [MedicationScheduleTime(hour: 8, minute: 0)],
     remindersEnabled: true,
     status: 'active',
+    safetyWarningsAcknowledged: safetyWarningsAcknowledged,
+    safetyWarningCount: safetyWarningCount,
     createdAt: createdAt,
     updatedAt: updatedAt,
   );

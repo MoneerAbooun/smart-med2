@@ -12,6 +12,7 @@ import 'package:smart_med/features/interactions/data/interaction_history_reposit
 import 'package:smart_med/features/interactions/data/models/drug_interaction_record.dart';
 import 'package:smart_med/features/interactions/data/models/interaction_history_record.dart';
 import 'package:smart_med/features/interactions/domain/models/drug_interaction_lookup_result.dart';
+import 'package:smart_med/features/interactions/presentation/interaction_result_localization.dart';
 import 'package:smart_med/features/interactions/presentation/widgets/interaction_severity_chip.dart';
 import 'package:smart_med/features/medicine_search/data/repositories/medicine_search_history_repository.dart';
 import 'package:smart_med/features/medicine_search/presentation/widgets/medicine_name_suggestion_helpers.dart';
@@ -810,7 +811,10 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
           const SizedBox(height: 8),
           InteractionSeverityChip(severity: result.severity),
           const SizedBox(height: 12),
-          Text(result.summary, style: Theme.of(context).textTheme.bodyLarge),
+          Text(
+            l10n.interactionResultText(result.summary),
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
           _buildMedicineResolutionSection(context, result),
           if (hasMechanism) ...[
             const SizedBox(height: 18),
@@ -818,7 +822,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
               context,
               icon: Icons.science_outlined,
               title: l10n.text('interactions.result.why'),
-              items: [result.mechanism!.trim()],
+              items: [l10n.interactionResultText(result.mechanism!.trim())],
             ),
           ],
           if (result.warnings.isNotEmpty) ...[
@@ -827,7 +831,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
               context,
               icon: Icons.warning_amber_rounded,
               title: l10n.text('interactions.result.warnings'),
-              items: result.warnings,
+              items: l10n.interactionResultTexts(result.warnings),
             ),
           ],
           if (result.recommendations.isNotEmpty) ...[
@@ -836,7 +840,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
               context,
               icon: Icons.health_and_safety_outlined,
               title: l10n.text('interactions.result.next'),
-              items: result.recommendations,
+              items: l10n.interactionResultTexts(result.recommendations),
             ),
           ],
           if (result.evidence.isNotEmpty) ...[
@@ -845,7 +849,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
               context,
               icon: Icons.info_outline,
               title: l10n.text('interactions.result.evidence'),
-              items: result.evidence,
+              items: l10n.interactionResultTexts(result.evidence),
             ),
           ],
           const SizedBox(height: 18),
@@ -874,7 +878,7 @@ class _CheckInteractionsPageState extends State<CheckInteractionsPage> {
         context,
         icon: Icons.error_outline,
         title: l10n.text('interactions.result.errorTitle'),
-        message: _errorMessage!,
+        message: l10n.interactionResultText(_errorMessage!),
         accentColor: Theme.of(context).colorScheme.error,
       );
     }

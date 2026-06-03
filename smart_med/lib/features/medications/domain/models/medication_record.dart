@@ -24,6 +24,8 @@ class MedicationRecord {
     this.imageUrl,
     required this.remindersEnabled,
     required this.status,
+    this.safetyWarningsAcknowledged = false,
+    this.safetyWarningCount = 0,
     this.notificationIds = const <int>[],
     this.createdAt,
     this.updatedAt,
@@ -50,6 +52,8 @@ class MedicationRecord {
   final String? imageUrl;
   final bool remindersEnabled;
   final String status;
+  final bool safetyWarningsAcknowledged;
+  final int safetyWarningCount;
   final List<int> notificationIds;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -112,6 +116,11 @@ class MedicationRecord {
         defaultValue: true,
       ),
       status: FirestoreValueParser.stringOrNull(map['status']) ?? 'active',
+      safetyWarningsAcknowledged: FirestoreValueParser.boolOrDefault(
+        map['safetyWarningsAcknowledged'],
+      ),
+      safetyWarningCount:
+          FirestoreValueParser.intOrNull(map['safetyWarningCount']) ?? 0,
       notificationIds: FirestoreValueParser.intList(map['notificationIds']),
       createdAt: FirestoreValueParser.dateTime(map['createdAt']),
       updatedAt: FirestoreValueParser.dateTime(map['updatedAt']),
@@ -140,6 +149,8 @@ class MedicationRecord {
     String? imageUrl,
     bool? remindersEnabled,
     String? status,
+    bool? safetyWarningsAcknowledged,
+    int? safetyWarningCount,
     List<int>? notificationIds,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -167,6 +178,9 @@ class MedicationRecord {
       imageUrl: imageUrl ?? this.imageUrl,
       remindersEnabled: remindersEnabled ?? this.remindersEnabled,
       status: status ?? this.status,
+      safetyWarningsAcknowledged:
+          safetyWarningsAcknowledged ?? this.safetyWarningsAcknowledged,
+      safetyWarningCount: safetyWarningCount ?? this.safetyWarningCount,
       notificationIds: notificationIds ?? this.notificationIds,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -198,6 +212,8 @@ class MedicationRecord {
       'imageUrl': imageUrl,
       'remindersEnabled': remindersEnabled,
       'status': status,
+      'safetyWarningsAcknowledged': safetyWarningsAcknowledged,
+      'safetyWarningCount': safetyWarningCount,
       'notificationIds': notificationIds,
       'createdAt': createdAt,
       'updatedAt': updatedAt,

@@ -9,6 +9,8 @@ import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/core/firebase/image_storage_repository.dart';
 import 'package:smart_med/features/auth/data/repositories/auth_repository.dart';
 import 'package:smart_med/features/auth/data/repositories/auth_user_flow_repository.dart';
+import 'package:smart_med/features/medications/data/repositories/medication_dose_history_repository.dart';
+import 'package:smart_med/features/medications/domain/models/medication_dose_history_record.dart';
 import 'package:smart_med/features/medications/presentation/pages/add_medication_page.dart';
 import 'package:smart_med/features/medications/presentation/pages/medication_list_page.dart';
 import 'package:smart_med/features/profile/data/repositories/profile_repository.dart';
@@ -37,6 +39,8 @@ class _ProfilePageState extends State<ProfilePage> {
   final ImagePicker _imagePicker = ImagePicker();
   final ProfileRepository _profileRepository = profileRepository;
   final ImageStorageRepository _imageStorageRepository = imageStorageRepository;
+  final MedicationDoseHistoryRepository _doseHistoryRepository =
+      medicationDoseHistoryRepository;
 
   bool isLoadingProfile = true;
   bool isSavingProfile = false;
@@ -1068,11 +1072,206 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  String _formatHistoryDateTime(BuildContext context, DateTime value) {
+    final localValue = value.toLocal();
+    final localizations = MaterialLocalizations.of(context);
+    final l10n = context.l10n;
+
+    return l10n.format('profile.history.dateTime', <String, String>{
+      'date': l10n.isolate(localizations.formatShortDate(localValue)),
+      'time': l10n.isolate(TimeOfDay.fromDateTime(localValue).format(context)),
+    });
+  }
+
+  String _historyStatusLabel(
+    BuildContext context,
+    MedicationDoseHistoryRecord entry,
+  ) {
+    return context.l10n.text(
+      entry.isTaken ? 'profile.history.taken' : 'profile.history.skipped',
+    );
+  }
+
+  IconData _historyIcon(MedicationDoseHistoryRecord entry) {
+    return entry.isTaken ? Icons.check_circle_outline : Icons.cancel_outlined;
+  }
+
+  Color _historyAccentColor(
+    ColorScheme colorScheme,
+    MedicationDoseHistoryRecord entry,
+  ) {
+    return entry.isTaken ? Colors.green.shade700 : colorScheme.error;
+  }
+
+  Widget _buildMedicationHistoryRow(
+    BuildContext context,
+    MedicationDoseHistoryRecord entry,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
+    final accentColor = _historyAccentColor(colorScheme, entry);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppIconBadge(
+            icon: _historyIcon(entry),
+            accentColor: accentColor,
+            size: 40,
+            iconSize: 20,
+            borderRadius: 14,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.isolate(entry.medicationName),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  l10n.isolate(entry.dosage),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  l10n.format('profile.history.scheduled', <String, String>{
+                    'time': _formatHistoryDateTime(context, entry.scheduledAt),
+                  }),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: accentColor.withValues(alpha: 0.18)),
+            ),
+            child: Text(
+              _historyStatusLabel(context, entry),
+              style: textTheme.labelMedium?.copyWith(
+                color: accentColor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildMedicationHistoryCard(BuildContext context, String uid) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final l10n = context.l10n;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        border: Border.all(color: colorScheme.outlineVariant, width: 1),
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          buildSectionHeading(
+            icon: Icons.history_outlined,
+            title: l10n.text('profile.history.title'),
+            subtitle: l10n.text('profile.history.subtitle'),
+          ),
+          const SizedBox(height: 14),
+          StreamBuilder<List<MedicationDoseHistoryRecord>>(
+            stream: _doseHistoryRepository.watchRecent(uid: uid, limit: 12),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting &&
+                  !snapshot.hasData) {
+                return Row(
+                  children: [
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        l10n.text('profile.history.loading'),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }
+
+              if (snapshot.hasError) {
+                return Text(
+                  l10n.text('profile.history.loadError'),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.error,
+                  ),
+                );
+              }
+
+              final history =
+                  snapshot.data ?? const <MedicationDoseHistoryRecord>[];
+              if (history.isEmpty) {
+                return Text(
+                  l10n.text('profile.history.empty'),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                );
+              }
+
+              return Column(
+                children: history
+                    .map((entry) => _buildMedicationHistoryRow(context, entry))
+                    .toList(growable: false),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final l10n = context.l10n;
     final profileImageProvider = _currentProfileImageProvider();
+    final user = FirebaseAuth.instance.currentUser;
 
     return SafeArea(
       child: Scaffold(
@@ -1261,6 +1460,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
                                 buildSafetyReadinessCard(context),
                                 const SizedBox(height: 25),
+
+                                if (user != null) ...[
+                                  buildMedicationHistoryCard(context, user.uid),
+                                  const SizedBox(height: 25),
+                                ],
 
                                 SizedBox(
                                   width: double.infinity,

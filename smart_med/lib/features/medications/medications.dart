@@ -1,6 +1,10 @@
+export 'data/repositories/medication_dose_history_repository.dart';
 export 'data/repositories/medication_repository.dart';
+export 'data/services/medication_safety_assessment_service.dart';
+export 'domain/models/medication_dose_history_record.dart';
 export 'domain/models/medication_record.dart';
 export 'domain/models/medication_schedule_time.dart';
+export 'domain/models/medication_safety_assessment.dart';
 export 'presentation/pages/add_medication_page.dart';
 export 'presentation/pages/edit_medication_page.dart';
 export 'presentation/pages/medication_list_page.dart';

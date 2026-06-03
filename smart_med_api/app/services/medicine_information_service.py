@@ -3,34 +3,17 @@ from __future__ import annotations
 from fastapi import HTTPException
 
 from app.ml.drug_name_model import predict_generic_name
-from app.models.drug_models import DrugAlternativeItem
 from app.models.medicine_models import MedicineInformationResponse
 from app.services.dailymed_service import get_spl_by_rxcui
+from app.services.drug_alternative_filter import (
+    RELATED_TERM_TYPES,
+    collect_alternatives,
+    normalized_text,
+)
 from app.services.openfda_service import extract_label_sections, get_label_by_generic_or_brand_name
 from app.services.rxnorm_service import get_related_concepts_by_type, resolve_drug_name
 
-RELATED_TERM_TYPES = ["SCD", "SBD", "GPCK", "BPCK", "BN"]
 MIN_PREDICTED_GENERIC_CONFIDENCE = 0.65
-
-CATEGORY_BY_TERM_TYPE = {
-    "SCD": "Generic drug",
-    "SBD": "Brand drug",
-    "GPCK": "Generic pack",
-    "BPCK": "Brand pack",
-    "BN": "Brand name",
-}
-
-
-def _normalized_text(value: str | None) -> str:
-    if not value:
-        return ""
-    return " ".join(value.lower().split())
-
-
-def _preferred_name(concept: dict[str, str]) -> str:
-    synonym = concept.get("synonym", "").strip()
-    name = concept.get("name", "").strip()
-    return synonym or name
 
 
 def _unique_strings(values: list[str]) -> list[str]:
@@ -50,39 +33,6 @@ def _unique_strings(values: list[str]) -> list[str]:
         results.append(cleaned)
 
     return results
-
-
-def _collect_alternatives(
-    related: dict[str, list[dict[str, str]]],
-    query: str,
-    matched_name: str | None,
-    limit: int = 12,
-) -> list[DrugAlternativeItem]:
-    alternatives: list[DrugAlternativeItem] = []
-    seen: set[str] = {_normalized_text(query), _normalized_text(matched_name)}
-
-    for term_type in RELATED_TERM_TYPES:
-        for concept in related.get(term_type, []):
-            name = _preferred_name(concept)
-            key = _normalized_text(name)
-
-            if not name or not key or key in seen:
-                continue
-
-            seen.add(key)
-            alternatives.append(
-                DrugAlternativeItem(
-                    name=name,
-                    rxcui=concept.get("rxcui") or None,
-                    term_type=concept.get("tty") or term_type,
-                    category=CATEGORY_BY_TERM_TYPE.get(term_type, "Alternative"),
-                )
-            )
-
-            if len(alternatives) >= limit:
-                return alternatives
-
-    return alternatives
 
 
 def _build_warning_items(sections: dict[str, list[str]]) -> list[str]:
@@ -117,7 +67,7 @@ def _predicted_generic_query(query: str) -> str | None:
     if confidence is None or confidence < MIN_PREDICTED_GENERIC_CONFIDENCE:
         return None
 
-    if _normalized_text(predicted_generic_name) == _normalized_text(query):
+    if normalized_text(predicted_generic_name) == normalized_text(query):
         return None
 
     return predicted_generic_name
@@ -171,7 +121,16 @@ async def lookup_medicine_information(
         or ([generic_name] if generic_name else ([matched_name] if matched_name else []))
     )
     related = await get_related_concepts_by_type(rxcui, RELATED_TERM_TYPES)
-    alternatives = _collect_alternatives(related, normalized_query, matched_name)
+    alternatives = collect_alternatives(
+        related,
+        normalized_query,
+        matched_name,
+        reference_names=[
+            generic_name,
+            *sections["brand_names"],
+            *active_ingredients,
+        ],
+    )
 
     return MedicineInformationResponse(
         query=normalized_query,

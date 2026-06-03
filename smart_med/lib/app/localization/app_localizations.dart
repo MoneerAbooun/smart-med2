@@ -43,7 +43,10 @@ class AppLocalizations {
       'high' || 'major' || 'severe' => 'severity.high',
       'moderate' => 'severity.moderate',
       'low' => 'severity.low',
-      'none' || 'no interaction' || 'no known interaction' => 'severity.none',
+      'none' ||
+      'no interaction' ||
+      'no known interaction' ||
+      'no specific interaction found' => 'severity.none',
       'info' || 'information' => 'severity.info',
       'unknown' => 'severity.unknown',
       _ => null,
@@ -237,18 +240,25 @@ class AppLocalizations {
     'home.dose.markedTaken': '{medicine} marked as taken.',
     'home.dose.markedSkipped': '{medicine} marked as skipped.',
     'home.dose.snoozedUntil': '{medicine} snoozed until {time}.',
+    'home.dose.historySaveError':
+        'We could not save this dose history. Please try again.',
     'home.safety.missing.age': 'Age',
     'home.safety.missing.weight': 'Weight',
     'home.safety.missing.bloodPressure': 'Blood pressure',
     'home.safety.missing.saveSetup': 'Save setup',
-    'home.safety.title': 'Safety status',
+    'home.safety.title': 'Safety profile',
     'home.safety.loading': 'Loading your safety profile...',
     'home.safety.complete':
-        'Your safety profile has the key details needed for better checks.',
+        'Your profile details are ready to personalize medicine checks.',
+    'home.safety.completeNoMedicines':
+        'Your profile details are ready. Add a medicine to check it against your safety profile.',
+    'home.safety.warningActive':
+        'One or more current medicines were added after safety warnings.',
+    'home.safety.warningMedicines': 'Added anyway: {medicines}',
     'home.safety.incomplete':
         'Profile {completed}/{total} complete. Add the missing details, or save setup if none apply.',
     'home.safety.summary':
-        '{allergies} allergies, {conditions} conditions, {medicines} active medicines',
+        '{allergies} allergies, {conditions} conditions, {medicines} current medicines',
     'home.safety.checkMedicines': 'Check medicines',
     'home.safety.finishProfile': 'Finish profile',
     'home.quickStart.title': 'Quick start',
@@ -280,6 +290,15 @@ class AppLocalizations {
     'profile.validation.ageRange': 'Please enter an age between 1 and 120.',
     'profile.saved': 'Profile saved.',
     'profile.saveError': 'We could not save your profile.',
+    'profile.history.title': 'Medicine history',
+    'profile.history.subtitle': 'Recent taken and skipped doses.',
+    'profile.history.loading': 'Loading medicine history...',
+    'profile.history.empty': 'No dose history yet.',
+    'profile.history.loadError': 'We could not load medicine history.',
+    'profile.history.taken': 'Taken',
+    'profile.history.skipped': 'Skipped',
+    'profile.history.dateTime': '{date} at {time}',
+    'profile.history.scheduled': 'Scheduled {time}',
     'profile.yourName': 'Your name',
     'profile.ageLabel': 'Age: ',
     'profile.saveProfile': 'Save profile',
@@ -357,6 +376,46 @@ class AppLocalizations {
         'Medicine name was filled from the photo. Please review the dose before saving.',
     'medication.photo.unavailable':
         'Photo fill is unavailable right now. You can still enter the details manually.',
+    'medication.safety.title': 'Safety check',
+    'medication.safety.checking':
+        'Checking this medicine against your allergies and health conditions...',
+    'medication.safety.pending':
+        'Safety check will run after the medicine is selected.',
+    'medication.safety.noSignals':
+        'No allergy or chronic-condition warning was found in your profile check. This is not medical advice.',
+    'medication.safety.signalsFound':
+        'Possible safety issues were found. Review them before saving.',
+    'medication.safety.limited':
+        'The safety check finished with limited results. Review the notes below.',
+    'medication.safety.error':
+        'We could not finish the allergy and condition safety check. Please retry.',
+    'medication.safety.wait':
+        'Please wait for the safety check to finish before saving.',
+    'medication.safety.confirmTitle': 'Review safety warnings',
+    'medication.safety.confirmMessage':
+        'Smart Med found possible allergy or condition warnings for {medicine}.',
+    'medication.safety.addAnyway': 'Add anyway',
+    'medication.safety.signal.directAllergy.title': 'Drug allergy match',
+    'medication.safety.signal.directAllergy.detail':
+        '{medicine} matches the drug allergy "{allergy}" in your profile.',
+    'medication.safety.signal.allergyInteraction.title':
+        'Possible allergy-drug interaction',
+    'medication.safety.signal.allergyInteraction.detail':
+        '{medicine} may interact with the allergy medicine "{allergy}": {summary}',
+    'medication.safety.signal.allergyWarning.title': 'Drug allergy warning',
+    'medication.safety.signal.allergyWarning.detail':
+        'Public label text for {medicine} mentions "{allergy}" in safety warnings.',
+    'medication.safety.signal.conditionWarning.title': 'Condition warning',
+    'medication.safety.signal.conditionWarning.detail':
+        'Public label text for {medicine} mentions "{condition}" in safety warnings.',
+    'medication.safety.note.profileMissing':
+        'We could not find your safety profile for this check.',
+    'medication.safety.note.labelUnavailable':
+        'Public medicine label warnings could not be checked: {error}',
+    'medication.safety.note.compareUnavailable':
+        'Could not compare {medicine} with allergy "{allergy}".',
+    'medication.safety.note.compareUnavailableDetail':
+        'Could not compare {medicine} with allergy "{allergy}": {error}',
     'medication.doseAmountRequired': 'Dose amount *',
     'medication.doseAmount': 'Dose amount',
     'medication.doseUnitRequired': 'Dose unit *',
@@ -597,45 +656,6 @@ class AppLocalizations {
     'quickProfile.medicines.more': '+{count} more in your medicine list',
     'quickProfile.medicines.review': 'Review list',
     'quickProfile.health.selectSex': 'Select biological sex',
-    'ai.title': 'Medicine guide',
-    'ai.guideSettings': 'Guide settings',
-    'ai.simpleOn': 'Simple language is on',
-    'ai.simpleOff': 'Simple language is off',
-    'ai.selectedMedicine': 'Selected medicine',
-    'ai.allMedicines': 'All medicines',
-    'ai.quickSummary': 'Quick summary',
-    'ai.interactions': 'Interactions',
-    'ai.cautions': 'Cautions',
-    'ai.source': 'Source',
-    'ai.rules': 'Rules',
-    'ai.aiRules': 'AI + Rules',
-    'ai.metric': '{label}: {value}',
-    'ai.profileDetailsToAdd': 'Profile details to add',
-    'ai.profileReady': 'Profile ready',
-    'ai.whyAppears': 'Why this appears: {sources}',
-    'ai.medicineOverview': 'Medicine overview',
-    'ai.generic': 'Generic: {name}',
-    'ai.evidence': 'Evidence',
-    'ai.evidenceDetails': 'Evidence details',
-    'ai.showEvidence': 'Show evidence',
-    'ai.rulesGuide': 'Rules-based safety guide',
-    'ai.aiGuide': 'AI-assisted safety guide',
-    'ai.rulesGuideBody':
-        'Smart Med used stored facts and safety rules because AI guidance was unavailable.',
-    'ai.aiGuideBody':
-        'AI simplified this explanation, while warnings still come from grounded app data.',
-    'ai.sourceLine': 'Source: {value}',
-    'ai.modelLine': 'Model: {value}',
-    'ai.generatedLine': 'Generated: {value}',
-    'ai.warningsForYou': 'Warnings for you',
-    'ai.interactionSummary': 'Interaction summary',
-    'ai.saferSteps': 'Safer steps',
-    'ai.questionsForClinician': 'Questions for your clinician',
-    'ai.informationToAdd': 'Information to add',
-    'ai.errorTitle': 'We could not generate the medicine guide.',
-    'ai.emptyGuide': 'The medicine guide was empty.',
-    'ai.safetyPreview': 'Safety preview',
-    'ai.warnings': 'Warnings',
   };
 
   static const Map<String, String> _ar = <String, String>{
@@ -817,18 +837,23 @@ class AppLocalizations {
     'home.dose.markedTaken': 'تم تسجيل {medicine} كجرعة مأخوذة.',
     'home.dose.markedSkipped': 'تم تخطي جرعة {medicine}.',
     'home.dose.snoozedUntil': 'تم تأجيل {medicine} حتى {time}.',
+    'home.dose.historySaveError': 'تعذر حفظ سجل هذه الجرعة. حاول مرة أخرى.',
     'home.safety.missing.age': 'العمر',
     'home.safety.missing.weight': 'الوزن',
     'home.safety.missing.bloodPressure': 'ضغط الدم',
     'home.safety.missing.saveSetup': 'حفظ الإعداد',
-    'home.safety.title': 'حالة السلامة',
+    'home.safety.title': 'ملف السلامة',
     'home.safety.loading': 'جار تحميل ملف السلامة...',
-    'home.safety.complete':
-        'يحتوي ملف السلامة على التفاصيل الأساسية لفحوصات أفضل.',
+    'home.safety.complete': 'تفاصيل ملفك جاهزة لتخصيص فحوصات الأدوية.',
+    'home.safety.completeNoMedicines':
+        'تفاصيل ملفك جاهزة. أضف دواء لفحصه مقابل ملف السلامة.',
+    'home.safety.warningActive':
+        'تمت إضافة دواء حالي واحد أو أكثر بعد تحذيرات السلامة.',
+    'home.safety.warningMedicines': 'أضيف على أي حال: {medicines}',
     'home.safety.incomplete':
         'اكتمل الملف {completed}/{total}. أضف التفاصيل الناقصة أو احفظ الإعداد إذا لم تنطبق.',
     'home.safety.summary':
-        'الحساسيات: {allergies}، الحالات: {conditions}، الأدوية النشطة: {medicines}',
+        'الحساسيات: {allergies}، الحالات: {conditions}، الأدوية الحالية: {medicines}',
     'home.safety.checkMedicines': 'فحص الأدوية',
     'home.safety.finishProfile': 'إكمال الملف',
     'home.quickStart.title': 'بدء سريع',
@@ -860,6 +885,15 @@ class AppLocalizations {
     'profile.validation.ageRange': 'يرجى إدخال عمر بين 1 و120.',
     'profile.saved': 'تم حفظ الملف الشخصي.',
     'profile.saveError': 'تعذر حفظ ملفك الشخصي.',
+    'profile.history.title': 'سجل الأدوية',
+    'profile.history.subtitle': 'آخر الجرعات المأخوذة والمتخطاة.',
+    'profile.history.loading': 'جار تحميل سجل الأدوية...',
+    'profile.history.empty': 'لا يوجد سجل جرعات بعد.',
+    'profile.history.loadError': 'تعذر تحميل سجل الأدوية.',
+    'profile.history.taken': 'مأخوذة',
+    'profile.history.skipped': 'متخطاة',
+    'profile.history.dateTime': '{date} في {time}',
+    'profile.history.scheduled': 'مجدولة {time}',
     'profile.yourName': 'اسمك',
     'profile.ageLabel': 'العمر: ',
     'profile.saveProfile': 'حفظ الملف',
@@ -934,6 +968,44 @@ class AppLocalizations {
         'تم تعبئة اسم الدواء من الصورة. يرجى مراجعة الجرعة قبل الحفظ.',
     'medication.photo.unavailable':
         'تعبئة الصورة غير متاحة الآن. يمكنك إدخال التفاصيل يدويا.',
+    'medication.safety.title': 'فحص السلامة',
+    'medication.safety.checking':
+        'جار فحص هذا الدواء مقابل حساسياتك وحالاتك الصحية...',
+    'medication.safety.pending': 'سيبدأ فحص السلامة بعد اختيار الدواء.',
+    'medication.safety.noSignals':
+        'لم يتم العثور على تحذير متعلق بالحساسية أو الحالات المزمنة في فحص ملفك. هذا ليس نصيحة طبية.',
+    'medication.safety.signalsFound':
+        'تم العثور على مشكلات سلامة محتملة. راجعها قبل الحفظ.',
+    'medication.safety.limited':
+        'اكتمل فحص السلامة بنتائج محدودة. راجع الملاحظات أدناه.',
+    'medication.safety.error':
+        'تعذر إكمال فحص الحساسية والحالات الصحية. يرجى إعادة المحاولة.',
+    'medication.safety.wait': 'يرجى انتظار انتهاء فحص السلامة قبل الحفظ.',
+    'medication.safety.confirmTitle': 'مراجعة تحذيرات السلامة',
+    'medication.safety.confirmMessage':
+        'وجد سمارت ميد تحذيرات محتملة متعلقة بالحساسية أو الحالات الصحية لـ {medicine}.',
+    'medication.safety.addAnyway': 'إضافة على أي حال',
+    'medication.safety.signal.directAllergy.title': 'تطابق مع حساسية دواء',
+    'medication.safety.signal.directAllergy.detail':
+        '{medicine} يطابق حساسية الدواء "{allergy}" الموجودة في ملفك.',
+    'medication.safety.signal.allergyInteraction.title':
+        'تداخل محتمل مع حساسية دواء',
+    'medication.safety.signal.allergyInteraction.detail':
+        'قد يتداخل {medicine} مع دواء الحساسية "{allergy}": {summary}',
+    'medication.safety.signal.allergyWarning.title': 'تحذير متعلق بحساسية دواء',
+    'medication.safety.signal.allergyWarning.detail':
+        'تذكر النشرة العامة لـ {medicine} "{allergy}" ضمن تحذيرات السلامة.',
+    'medication.safety.signal.conditionWarning.title': 'تحذير متعلق بحالة صحية',
+    'medication.safety.signal.conditionWarning.detail':
+        'تذكر النشرة العامة لـ {medicine} "{condition}" ضمن تحذيرات السلامة.',
+    'medication.safety.note.profileMissing':
+        'تعذر العثور على ملف السلامة لهذا الفحص.',
+    'medication.safety.note.labelUnavailable':
+        'تعذر فحص تحذيرات النشرة العامة: {error}',
+    'medication.safety.note.compareUnavailable':
+        'تعذرت مقارنة {medicine} مع حساسية "{allergy}".',
+    'medication.safety.note.compareUnavailableDetail':
+        'تعذرت مقارنة {medicine} مع حساسية "{allergy}": {error}',
     'medication.doseAmountRequired': 'كمية الجرعة *',
     'medication.doseAmount': 'كمية الجرعة',
     'medication.doseUnitRequired': 'وحدة الجرعة *',
@@ -1159,45 +1231,6 @@ class AppLocalizations {
     'quickProfile.medicines.more': '+{count} أخرى في قائمة أدويتك',
     'quickProfile.medicines.review': 'مراجعة القائمة',
     'quickProfile.health.selectSex': 'اختر الجنس البيولوجي',
-    'ai.title': 'دليل الدواء',
-    'ai.guideSettings': 'إعدادات الدليل',
-    'ai.simpleOn': 'اللغة المبسطة مفعلة',
-    'ai.simpleOff': 'اللغة المبسطة متوقفة',
-    'ai.selectedMedicine': 'الدواء المحدد',
-    'ai.allMedicines': 'كل الأدوية',
-    'ai.quickSummary': 'ملخص سريع',
-    'ai.interactions': 'التداخلات',
-    'ai.cautions': 'تنبيهات',
-    'ai.source': 'المصدر',
-    'ai.rules': 'القواعد',
-    'ai.aiRules': 'الذكاء الاصطناعي + القواعد',
-    'ai.metric': '{label}: {value}',
-    'ai.profileDetailsToAdd': 'تفاصيل الملف التي يجب إضافتها',
-    'ai.profileReady': 'الملف جاهز',
-    'ai.whyAppears': 'سبب الظهور: {sources}',
-    'ai.medicineOverview': 'نظرة عامة على الدواء',
-    'ai.generic': 'الاسم العلمي: {name}',
-    'ai.evidence': 'الأدلة',
-    'ai.evidenceDetails': 'تفاصيل الأدلة',
-    'ai.showEvidence': 'عرض الأدلة',
-    'ai.rulesGuide': 'دليل سلامة مبني على القواعد',
-    'ai.aiGuide': 'دليل سلامة بمساعدة الذكاء الاصطناعي',
-    'ai.rulesGuideBody':
-        'استخدم سمارت ميد الحقائق المحفوظة وقواعد السلامة لأن إرشادات الذكاء الاصطناعي غير متاحة.',
-    'ai.aiGuideBody':
-        'بسّط الذكاء الاصطناعي هذا الشرح، بينما لا تزال التحذيرات تأتي من بيانات التطبيق الموثوقة.',
-    'ai.sourceLine': 'المصدر: {value}',
-    'ai.modelLine': 'النموذج: {value}',
-    'ai.generatedLine': 'تم الإنشاء: {value}',
-    'ai.warningsForYou': 'تحذيرات تخصك',
-    'ai.interactionSummary': 'ملخص التداخلات',
-    'ai.saferSteps': 'خطوات أكثر أمانا',
-    'ai.questionsForClinician': 'أسئلة للطبيب',
-    'ai.informationToAdd': 'معلومات يجب إضافتها',
-    'ai.errorTitle': 'تعذر إنشاء دليل الدواء.',
-    'ai.emptyGuide': 'كان دليل الدواء فارغا.',
-    'ai.safetyPreview': 'معاينة السلامة',
-    'ai.warnings': 'تحذيرات',
   };
 }
 

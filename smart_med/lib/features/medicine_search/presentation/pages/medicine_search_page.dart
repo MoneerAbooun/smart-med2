@@ -10,6 +10,7 @@ import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/features/medicine_search/data/repositories/medicine_lookup_repository.dart';
 import 'package:smart_med/features/medicine_search/data/repositories/medicine_search_history_repository.dart';
 import 'package:smart_med/features/medicine_search/domain/models/medicine_lookup_result.dart';
+import 'package:smart_med/features/medicine_search/presentation/medicine_result_localization.dart';
 import 'package:smart_med/features/medicine_search/presentation/widgets/medicine_name_suggestion_helpers.dart';
 
 enum MedicineSearchMode { none, name, image }
@@ -809,14 +810,21 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
     required String title,
     required List<String> items,
     required String emptyMessage,
+    required MedicineResultSection section,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
-    final displayItems = items.isEmpty ? <String>[emptyMessage] : items;
-    final isPlaceholder = items.isEmpty;
+    final localizedItems = context.l10n.medicineResultTexts(
+      items,
+      section: section,
+    );
+    final displayItems = localizedItems.isEmpty
+        ? <String>[emptyMessage]
+        : localizedItems;
+    final isPlaceholder = localizedItems.isEmpty;
     final isExpanded = _expandedSectionId == title;
-    final canExpand = items.isNotEmpty;
-    final preview = _sectionPreview(context, items, emptyMessage);
-    final countLabel = _sectionCountLabel(context, items);
+    final canExpand = localizedItems.isNotEmpty;
+    final preview = _sectionPreview(context, localizedItems, emptyMessage);
+    final countLabel = _sectionCountLabel(context, localizedItems);
 
     return Material(
       color: Colors.transparent,
@@ -931,7 +939,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Text(
-                                      context.l10n.isolate(item),
+                                      item,
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodyMedium
@@ -1039,7 +1047,9 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
                 l10n.format(
                   'medicineSearch.details.photoNote',
                   <String, String>{
-                    'note': l10n.isolate(result.identificationReason ?? ''),
+                    'note': l10n.medicineResultText(
+                      result.identificationReason ?? '',
+                    ),
                   },
                 ),
                 style: Theme.of(context).textTheme.bodyMedium,
@@ -1053,6 +1063,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             title: l10n.text('medicineSearch.section.brandNames'),
             items: result.brandNames,
             emptyMessage: l10n.text('medicineSearch.empty.brandNames'),
+            section: MedicineResultSection.brandNames,
           ),
           const SizedBox(height: 12),
           _buildListSection(
@@ -1061,6 +1072,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             title: l10n.text('medicineSearch.section.activeIngredients'),
             items: result.activeIngredients,
             emptyMessage: l10n.text('medicineSearch.empty.activeIngredients'),
+            section: MedicineResultSection.activeIngredients,
           ),
           const SizedBox(height: 12),
           _buildListSection(
@@ -1069,6 +1081,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             title: l10n.text('medicineSearch.section.commonUses'),
             items: result.usedFor,
             emptyMessage: l10n.text('medicineSearch.empty.commonUses'),
+            section: MedicineResultSection.commonUses,
           ),
           const SizedBox(height: 12),
           _buildListSection(
@@ -1077,6 +1090,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             title: l10n.text('medicineSearch.section.doseInformation'),
             items: result.dose,
             emptyMessage: l10n.text('medicineSearch.empty.doseInformation'),
+            section: MedicineResultSection.dose,
           ),
           const SizedBox(height: 12),
           _buildListSection(
@@ -1085,6 +1099,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             title: l10n.text('medicineSearch.section.warnings'),
             items: result.warnings,
             emptyMessage: l10n.text('medicineSearch.empty.warnings'),
+            section: MedicineResultSection.warnings,
           ),
           const SizedBox(height: 12),
           _buildListSection(
@@ -1093,6 +1108,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             title: l10n.text('medicineSearch.section.sideEffects'),
             items: result.sideEffects,
             emptyMessage: l10n.text('medicineSearch.empty.sideEffects'),
+            section: MedicineResultSection.sideEffects,
           ),
           const SizedBox(height: 12),
           _buildListSection(
@@ -1101,6 +1117,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             title: l10n.text('medicineSearch.section.storage'),
             items: result.storage,
             emptyMessage: l10n.text('medicineSearch.empty.storage'),
+            section: MedicineResultSection.storage,
           ),
           const SizedBox(height: 12),
           _buildListSection(
@@ -1109,6 +1126,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
             title: l10n.text('medicineSearch.section.disclaimer'),
             items: result.disclaimer,
             emptyMessage: l10n.text('medicineSearch.empty.disclaimer'),
+            section: MedicineResultSection.disclaimer,
           ),
         ],
       ),
@@ -1123,7 +1141,7 @@ class _MedicineSearchPageState extends State<MedicineSearchPage> {
         context,
         icon: Icons.error_outline,
         title: l10n.text('medicineSearch.error.title'),
-        message: _errorMessage!,
+        message: l10n.medicineResultText(_errorMessage!),
         accentColor: Theme.of(context).colorScheme.error,
       );
     }

@@ -27,6 +27,13 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
+    match /users/{userId}/medication_history/{historyId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.userId == userId;
+      allow delete: if isOwner(userId);
+    }
+
     match /users/{userId}/reminders/{reminderId} {
       allow read: if isOwner(userId);
       allow create, update: if isOwner(userId)

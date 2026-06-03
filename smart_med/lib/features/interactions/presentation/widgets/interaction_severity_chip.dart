@@ -15,6 +15,10 @@ class InteractionSeverityChip extends StatelessWidget {
       case 'moderate':
         return Colors.orange.shade700;
       case 'low':
+      case 'none':
+      case 'no interaction':
+      case 'no known interaction':
+      case 'no specific interaction found':
         return Colors.green.shade700;
       default:
         return Theme.of(context).colorScheme.primary;

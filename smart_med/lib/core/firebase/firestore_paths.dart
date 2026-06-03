@@ -6,6 +6,7 @@ class FirestorePaths {
   static const String users = 'users';
   static const String legacyUsers = 'Users';
   static const String medications = 'medications';
+  static const String medicationHistory = 'medication_history';
   static const String reminders = 'reminders';
   static const String allergies = 'allergies';
   static const String medicalConditions = 'medical_conditions';
@@ -53,6 +54,21 @@ class FirestorePaths {
     String medicationId,
   ) {
     return medicationsCollection(firestore, uid).doc(medicationId);
+  }
+
+  static CollectionReference<Map<String, dynamic>> medicationHistoryCollection(
+    FirebaseFirestore firestore,
+    String uid,
+  ) {
+    return userDoc(firestore, uid).collection(medicationHistory);
+  }
+
+  static DocumentReference<Map<String, dynamic>> medicationHistoryDoc(
+    FirebaseFirestore firestore,
+    String uid,
+    String historyId,
+  ) {
+    return medicationHistoryCollection(firestore, uid).doc(historyId);
   }
 
   static CollectionReference<Map<String, dynamic>> remindersCollection(

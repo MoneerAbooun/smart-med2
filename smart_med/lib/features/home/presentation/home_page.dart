@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:smart_med/app/localization/app_localizations.dart';
 import 'package:smart_med/app/widgets/app_icon_badge.dart';
 import 'package:smart_med/features/alternative_drug/alternative_drug.dart';
+import 'package:smart_med/features/home/domain/home_medication_status.dart';
 import 'package:smart_med/features/interactions/interactions.dart';
 import 'package:smart_med/features/medications/medications.dart';
 import 'package:smart_med/features/medicine_search/medicine_search.dart';
@@ -23,6 +24,8 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final ImagePicker _picker = ImagePicker();
+  final MedicationDoseHistoryRepository _doseHistoryRepository =
+      medicationDoseHistoryRepository;
 
   bool isCameraOpened = false;
   bool isCapturing = false;
@@ -32,6 +35,7 @@ class _HomePageState extends State<HomePage> {
   Future<void>? initializeControllerFuture;
   XFile? selectedImage;
   final Set<String> _handledDoseKeys = <String>{};
+  final Set<String> _pendingDoseKeys = <String>{};
   final Map<String, DateTime> _snoozedDoses = <String, DateTime>{};
 
   @override
@@ -383,43 +387,21 @@ class _HomePageState extends State<HomePage> {
   }
 
   DateTime _startOfDay(DateTime value) {
-    return DateTime(value.year, value.month, value.day);
-  }
-
-  DateTime _endOfDay(DateTime value) {
-    return DateTime(value.year, value.month, value.day, 23, 59, 59, 999);
+    return HomeMedicationStatus.startOfDay(value);
   }
 
   bool _isMedicationActiveOn(MedicationRecord medication, DateTime date) {
-    if (medication.status.trim().toLowerCase() != 'active') {
-      return false;
-    }
+    return HomeMedicationStatus.hasScheduledDoseOn(medication, date: date);
+  }
 
-    if (medication.scheduledTimes.isEmpty) {
-      return false;
-    }
-
-    final dayStart = _startOfDay(date);
-    final dayEnd = _endOfDay(date);
-    final startDate = medication.startDate;
-    final endDate = medication.endDate;
-
-    if (startDate != null && startDate.isAfter(dayEnd)) {
-      return false;
-    }
-
-    if (endDate != null && endDate.isBefore(dayStart)) {
-      return false;
-    }
-
-    return true;
+  List<MedicationRecord> _currentMedications(List<MedicationRecord> items) {
+    final now = DateTime.now();
+    return HomeMedicationStatus.currentRegimen(items, onDate: now);
   }
 
   List<MedicationRecord> _activeMedications(List<MedicationRecord> items) {
     final now = DateTime.now();
-    return items
-        .where((medication) => _isMedicationActiveOn(medication, now))
-        .toList(growable: false);
+    return HomeMedicationStatus.scheduledOn(items, date: now);
   }
 
   String _doseKey(MedicationRecord medication, DateTime scheduledAt) {
@@ -427,7 +409,10 @@ class _HomePageState extends State<HomePage> {
     return '$medicationKey-${scheduledAt.year}-${scheduledAt.month}-${scheduledAt.day}-${scheduledAt.hour}-${scheduledAt.minute}';
   }
 
-  List<_HomeDose> _buildDoseTimeline(List<MedicationRecord> medications) {
+  List<_HomeDose> _buildDoseTimeline(
+    List<MedicationRecord> medications,
+    Set<String> handledDoseKeys,
+  ) {
     final now = DateTime.now();
     final today = _startOfDay(now);
     final doses = <_HomeDose>[];
@@ -449,7 +434,7 @@ class _HomePageState extends State<HomePage> {
           );
           final key = _doseKey(medication, scheduledAt);
 
-          if (_handledDoseKeys.contains(key)) {
+          if (handledDoseKeys.contains(key)) {
             continue;
           }
 
@@ -471,11 +456,14 @@ class _HomePageState extends State<HomePage> {
     return doses;
   }
 
-  List<_HomeDose> _buildTodayDoses(List<MedicationRecord> medications) {
+  List<_HomeDose> _buildTodayDoses(
+    List<MedicationRecord> medications,
+    Set<String> handledDoseKeys,
+  ) {
     final now = DateTime.now();
     final today = _startOfDay(now);
 
-    return _buildDoseTimeline(medications)
+    return _buildDoseTimeline(medications, handledDoseKeys)
         .where((dose) {
           return _startOfDay(dose.scheduledAt) == today;
         })
@@ -519,18 +507,67 @@ class _HomePageState extends State<HomePage> {
     AppSnackBar.show(context, message, type: AppSnackBarType.success);
   }
 
-  void _markDoseHandled(_HomeDose dose, String messageKey) {
+  Future<void> _markDoseHandled(_HomeDose dose, String status) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || _pendingDoseKeys.contains(dose.key)) {
+      return;
+    }
+
     setState(() {
-      _handledDoseKeys.add(dose.key);
-      _snoozedDoses.remove(dose.key);
+      _pendingDoseKeys.add(dose.key);
     });
 
-    final l10n = context.l10n;
-    _showHomeMessage(
-      l10n.format(messageKey, <String, String>{
-        'medicine': l10n.isolate(dose.medication.name),
-      }),
+    final recordedAt = DateTime.now();
+    final entry = MedicationDoseHistoryRecord(
+      userId: user.uid,
+      doseKey: dose.key,
+      medicationId: dose.medication.id,
+      medicationName: dose.medication.name,
+      dosage: dose.medication.dosage,
+      doseAmount: dose.medication.doseAmount,
+      doseUnit: dose.medication.doseUnit,
+      scheduledAt: dose.scheduledAt,
+      recordedAt: recordedAt,
+      status: status,
     );
+
+    try {
+      await _doseHistoryRepository.saveEntry(uid: user.uid, entry: entry);
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pendingDoseKeys.remove(dose.key);
+        _handledDoseKeys.add(dose.key);
+        _snoozedDoses.remove(dose.key);
+      });
+
+      final l10n = context.l10n;
+      final messageKey = status == MedicationDoseHistoryRecord.statusTaken
+          ? 'home.dose.markedTaken'
+          : 'home.dose.markedSkipped';
+      _showHomeMessage(
+        l10n.format(messageKey, <String, String>{
+          'medicine': l10n.isolate(dose.medication.name),
+        }),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _pendingDoseKeys.remove(dose.key);
+      });
+
+      AppSnackBar.show(
+        context,
+        context.l10n.text('home.dose.historySaveError'),
+        type: AppSnackBarType.error,
+      );
+    }
   }
 
   void _snoozeDose(_HomeDose dose) {
@@ -552,17 +589,20 @@ class _HomePageState extends State<HomePage> {
   Widget _buildNextDoseCard({
     required BuildContext context,
     required List<MedicationRecord> medications,
+    required Set<String> handledDoseKeys,
     required bool isLoading,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
-    final activeMedications = _activeMedications(medications);
-    final timeline = _buildDoseTimeline(activeMedications);
+    final currentMedications = _currentMedications(medications);
+    final timeline = _buildDoseTimeline(currentMedications, handledDoseKeys);
     final nextDose = timeline.isEmpty ? null : timeline.first;
     final now = DateTime.now();
     final isNextDoseOverdue = nextDose != null && _isDoseOverdue(nextDose, now);
     final canMarkNextDoseTaken = nextDose != null && _isDoseDue(nextDose, now);
+    final isNextDosePending =
+        nextDose != null && _pendingDoseKeys.contains(nextDose.key);
     final cardBackgroundColor = isNextDoseOverdue
         ? colorScheme.error
         : colorScheme.primary;
@@ -614,7 +654,7 @@ class _HomePageState extends State<HomePage> {
                 Row(
                   children: [
                     AppIconBadge(
-                      icon: activeMedications.isEmpty
+                      icon: currentMedications.isEmpty
                           ? Icons.add_box_outlined
                           : Icons.check_circle_outline,
                       accentColor: cardForegroundColor,
@@ -625,7 +665,7 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        activeMedications.isEmpty
+                        currentMedications.isEmpty
                             ? l10n.text('home.noMedicines.title')
                             : l10n.text('home.noDoses.title'),
                         style: textTheme.titleLarge?.copyWith(
@@ -638,7 +678,7 @@ class _HomePageState extends State<HomePage> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  activeMedications.isEmpty
+                  currentMedications.isEmpty
                       ? l10n.text('home.noMedicines.body')
                       : l10n.text('home.noDoses.body'),
                   style: textTheme.bodyMedium?.copyWith(
@@ -744,10 +784,10 @@ class _HomePageState extends State<HomePage> {
                   runSpacing: 10,
                   children: [
                     FilledButton.icon(
-                      onPressed: canMarkNextDoseTaken
+                      onPressed: canMarkNextDoseTaken && !isNextDosePending
                           ? () => _markDoseHandled(
                               nextDose,
-                              'home.dose.markedTaken',
+                              MedicationDoseHistoryRecord.statusTaken,
                             )
                           : null,
                       icon: const Icon(Icons.check),
@@ -764,7 +804,9 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () => _snoozeDose(nextDose),
+                      onPressed: isNextDosePending
+                          ? null
+                          : () => _snoozeDose(nextDose),
                       icon: const Icon(Icons.snooze),
                       label: Text(l10n.text('home.dose.snooze')),
                       style: OutlinedButton.styleFrom(
@@ -775,8 +817,12 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () =>
-                          _markDoseHandled(nextDose, 'home.dose.markedSkipped'),
+                      onPressed: isNextDosePending
+                          ? null
+                          : () => _markDoseHandled(
+                              nextDose,
+                              MedicationDoseHistoryRecord.statusSkipped,
+                            ),
                       icon: const Icon(Icons.close),
                       label: Text(l10n.text('home.dose.skip')),
                       style: OutlinedButton.styleFrom(
@@ -805,10 +851,10 @@ class _HomePageState extends State<HomePage> {
       return false;
     }
 
-    return profile.hasCompletedQuickProfileSetup ||
-        (profile.age != null &&
-            profile.weightKg != null &&
-            _hasBloodPressure(profile));
+    return profile.hasCompletedQuickProfileSetup &&
+        profile.age != null &&
+        profile.weightKg != null &&
+        _hasBloodPressure(profile);
   }
 
   int _profileReadinessCount(UserProfileRecord? profile) {
@@ -845,7 +891,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildSafetyStatusCard({
     required BuildContext context,
     required UserProfileRecord? profile,
-    required List<MedicationRecord> activeMedications,
+    required List<MedicationRecord> currentMedications,
     required bool isLoading,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -854,14 +900,53 @@ class _HomePageState extends State<HomePage> {
     final isComplete = _isSafetyProfileReady(profile);
     final completed = _profileReadinessCount(profile);
     final missing = _missingSafetyItems(profile);
+    final hasCurrentMedications = currentMedications.isNotEmpty;
+    final safetyWarningMedications = currentMedications
+        .where((medication) => medication.safetyWarningsAcknowledged)
+        .toList(growable: false);
+    final hasAcknowledgedSafetyWarnings = safetyWarningMedications.isNotEmpty;
+    final warningMedicineNames = safetyWarningMedications
+        .map((medication) => l10n.isolate(medication.name))
+        .join(', ');
+    final safetyAccentColor = hasAcknowledgedSafetyWarnings
+        ? colorScheme.error
+        : isComplete
+        ? const Color(0xFF2E7D6F)
+        : colorScheme.primary;
+    final safetyIcon = hasAcknowledgedSafetyWarnings
+        ? Icons.warning_amber_rounded
+        : isComplete
+        ? Icons.verified_user_outlined
+        : Icons.shield_outlined;
+    final safetyStatusText = isLoading
+        ? l10n.text('home.safety.loading')
+        : hasAcknowledgedSafetyWarnings
+        ? l10n.text('home.safety.warningActive')
+        : isComplete && !hasCurrentMedications
+        ? l10n.text('home.safety.completeNoMedicines')
+        : isComplete
+        ? l10n.text('home.safety.complete')
+        : l10n.format('home.safety.incomplete', <String, String>{
+            'completed': completed.toString(),
+            'total': _safetyProfileItemCount.toString(),
+          });
+    final supportingTextColor = hasAcknowledgedSafetyWarnings
+        ? colorScheme.error
+        : colorScheme.onSurfaceVariant;
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: hasAcknowledgedSafetyWarnings
+            ? colorScheme.errorContainer.withValues(alpha: 0.24)
+            : colorScheme.surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(
+          color: hasAcknowledgedSafetyWarnings
+              ? colorScheme.error.withValues(alpha: 0.72)
+              : colorScheme.outlineVariant,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -870,12 +955,8 @@ class _HomePageState extends State<HomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               AppIconBadge(
-                icon: isComplete
-                    ? Icons.verified_user_outlined
-                    : Icons.shield_outlined,
-                accentColor: isComplete
-                    ? const Color(0xFF2E7D6F)
-                    : colorScheme.primary,
+                icon: safetyIcon,
+                accentColor: safetyAccentColor,
                 size: 46,
                 iconSize: 23,
                 borderRadius: 15,
@@ -893,19 +974,9 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      isLoading
-                          ? l10n.text('home.safety.loading')
-                          : isComplete
-                          ? l10n.text('home.safety.complete')
-                          : l10n.format(
-                              'home.safety.incomplete',
-                              <String, String>{
-                                'completed': completed.toString(),
-                                'total': _safetyProfileItemCount.toString(),
-                              },
-                            ),
+                      safetyStatusText,
                       style: textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                        color: supportingTextColor,
                       ),
                     ),
                   ],
@@ -920,12 +991,37 @@ class _HomePageState extends State<HomePage> {
                 'allergies': (profile?.allergyNames.length ?? 0).toString(),
                 'conditions': (profile?.medicalConditionNames.length ?? 0)
                     .toString(),
-                'medicines': activeMedications.length.toString(),
+                'medicines': currentMedications.length.toString(),
               }),
               style: textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
+            if (hasAcknowledgedSafetyWarnings) ...[
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    size: 18,
+                    color: colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      l10n.format('home.safety.warningMedicines', {
+                        'medicines': warningMedicineNames,
+                      }),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.error,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (missing.isNotEmpty) ...[
               const SizedBox(height: 12),
               Wrap(
@@ -956,13 +1052,22 @@ class _HomePageState extends State<HomePage> {
               ),
             ],
             const SizedBox(height: 14),
-            if (isComplete)
+            if (isComplete && hasCurrentMedications)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: _openPatientMedicationInteractionChecker,
                   icon: const Icon(Icons.compare_arrows_outlined),
                   label: Text(l10n.text('home.safety.checkMedicines')),
+                ),
+              )
+            else if (isComplete)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _openAddMedication,
+                  icon: const Icon(Icons.add),
+                  label: Text(l10n.text('common.addMedicine')),
                 ),
               )
             else
@@ -1045,11 +1150,12 @@ class _HomePageState extends State<HomePage> {
   Widget _buildTodayMedicationsCard({
     required BuildContext context,
     required List<MedicationRecord> activeMedications,
+    required Set<String> handledDoseKeys,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final l10n = context.l10n;
-    final todayDoses = _buildTodayDoses(activeMedications);
+    final todayDoses = _buildTodayDoses(activeMedications, handledDoseKeys);
 
     return Container(
       width: double.infinity,
@@ -1497,6 +1603,9 @@ class _HomePageState extends State<HomePage> {
       );
     }
 
+    final historyStart = _startOfDay(DateTime.now());
+    final historyEnd = historyStart.add(const Duration(days: 2));
+
     return SafeArea(
       child: Scaffold(
         extendBody: true,
@@ -1537,72 +1646,95 @@ class _HomePageState extends State<HomePage> {
             ),
           ],
         ),
-        body: StreamBuilder<List<MedicationRecord>>(
-          stream: medicationRepository.watchMedicationRecords(uid: user.uid),
-          builder: (context, medicationSnapshot) {
-            final medications =
-                medicationSnapshot.data ?? const <MedicationRecord>[];
-            final isLoadingMedications =
-                medicationSnapshot.connectionState == ConnectionState.waiting &&
-                !medicationSnapshot.hasData;
+        body: StreamBuilder<List<MedicationDoseHistoryRecord>>(
+          stream: _doseHistoryRepository.watchScheduledWindow(
+            uid: user.uid,
+            start: historyStart,
+            end: historyEnd,
+          ),
+          builder: (context, historySnapshot) {
+            final persistedHandledDoseKeys =
+                historySnapshot.data?.map((entry) => entry.doseKey).toSet() ??
+                const <String>{};
+            final handledDoseKeys = <String>{
+              ...persistedHandledDoseKeys,
+              ..._handledDoseKeys,
+            };
 
-            return StreamBuilder<UserProfileRecord?>(
-              stream: profileRepository.watchProfile(uid: user.uid),
-              builder: (context, profileSnapshot) {
-                final profile = profileSnapshot.data;
-                final isLoadingProfile =
-                    profileSnapshot.connectionState ==
+            return StreamBuilder<List<MedicationRecord>>(
+              stream: medicationRepository.watchMedicationRecords(
+                uid: user.uid,
+              ),
+              builder: (context, medicationSnapshot) {
+                final medications =
+                    medicationSnapshot.data ?? const <MedicationRecord>[];
+                final isLoadingMedications =
+                    medicationSnapshot.connectionState ==
                         ConnectionState.waiting &&
-                    !profileSnapshot.hasData;
-                final activeMedications = _activeMedications(medications);
+                    !medicationSnapshot.hasData;
 
-                return Center(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 16,
-                    ),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 430),
-                      child: Column(
-                        children: [
-                          _buildGreetingCard(context, profile),
-                          const SizedBox(height: 14),
-                          _buildNextDoseCard(
-                            context: context,
-                            medications: medications,
-                            isLoading: isLoadingMedications,
+                return StreamBuilder<UserProfileRecord?>(
+                  stream: profileRepository.watchProfile(uid: user.uid),
+                  builder: (context, profileSnapshot) {
+                    final profile = profileSnapshot.data;
+                    final isLoadingProfile =
+                        profileSnapshot.connectionState ==
+                            ConnectionState.waiting &&
+                        !profileSnapshot.hasData;
+                    final activeMedications = _activeMedications(medications);
+                    final currentMedications = _currentMedications(medications);
+
+                    return Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 16,
+                        ),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 430),
+                          child: Column(
+                            children: [
+                              _buildGreetingCard(context, profile),
+                              const SizedBox(height: 14),
+                              _buildNextDoseCard(
+                                context: context,
+                                medications: medications,
+                                handledDoseKeys: handledDoseKeys,
+                                isLoading: isLoadingMedications,
+                              ),
+                              const SizedBox(height: 14),
+                              _buildSafetyStatusCard(
+                                context: context,
+                                profile: profile,
+                                currentMedications: currentMedications,
+                                isLoading: isLoadingProfile,
+                              ),
+                              const SizedBox(height: 14),
+                              _buildQuickStartCard(context),
+                              if (_isScanPanelExpanded) ...[
+                                const SizedBox(height: 14),
+                                _buildScanMedicineCard(context),
+                              ],
+                              const SizedBox(height: 14),
+                              _buildTodayMedicationsCard(
+                                context: context,
+                                activeMedications: activeMedications,
+                                handledDoseKeys: handledDoseKeys,
+                              ),
+                              const SizedBox(height: 18),
+                              _buildSectionTitle(
+                                context,
+                                context.l10n.text('home.tools.title'),
+                              ),
+                              const SizedBox(height: 12),
+                              _buildActionGrid(context),
+                              const SizedBox(height: 80),
+                            ],
                           ),
-                          const SizedBox(height: 14),
-                          _buildSafetyStatusCard(
-                            context: context,
-                            profile: profile,
-                            activeMedications: activeMedications,
-                            isLoading: isLoadingProfile,
-                          ),
-                          const SizedBox(height: 14),
-                          _buildQuickStartCard(context),
-                          if (_isScanPanelExpanded) ...[
-                            const SizedBox(height: 14),
-                            _buildScanMedicineCard(context),
-                          ],
-                          const SizedBox(height: 14),
-                          _buildTodayMedicationsCard(
-                            context: context,
-                            activeMedications: activeMedications,
-                          ),
-                          const SizedBox(height: 18),
-                          _buildSectionTitle(
-                            context,
-                            context.l10n.text('home.tools.title'),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildActionGrid(context),
-                          const SizedBox(height: 80),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 );
               },
             );

@@ -90,3 +90,72 @@ def test_lookup_medicine_information_ignores_low_confidence_ml_fallback(monkeypa
 
     assert exc_info.value.status_code == 404
     assert resolve_calls == [arabic_unknown]
+
+
+def test_lookup_medicine_information_keeps_distinct_brand_alternatives(monkeypatch):
+    async def fake_resolve_drug_name(name: str):
+        assert name == "warfarin"
+        return "11289", "warfarin"
+
+    async def fake_get_spl_by_rxcui(rxcui: str):
+        assert rxcui == "11289"
+        return {"setid": "set-warfarin"}
+
+    async def fake_get_label_by_generic_or_brand_name(name: str):
+        assert name == "warfarin"
+        return {
+            "openfda": {
+                "generic_name": ["WARFARIN SODIUM"],
+                "brand_name": ["Coumadin"],
+                "substance_name": ["WARFARIN SODIUM"],
+            },
+            "indications_and_usage": ["Anticoagulant therapy"],
+        }
+
+    async def fake_get_related_concepts_by_type(rxcui: str, term_types: list[str]):
+        assert rxcui == "11289"
+        assert term_types == ["SCD", "SBD", "GPCK", "BPCK", "BN"]
+        return {
+            "SCD": [
+                {
+                    "rxcui": "855332",
+                    "name": "warfarin sodium 5 MG Oral Tablet",
+                    "synonym": "",
+                    "tty": "SCD",
+                }
+            ],
+            "SBD": [
+                {
+                    "rxcui": "855336",
+                    "name": "Coumadin 5 MG Oral Tablet",
+                    "synonym": "",
+                    "tty": "SBD",
+                },
+                {
+                    "rxcui": "855340",
+                    "name": "Jantoven 5 MG Oral Tablet",
+                    "synonym": "",
+                    "tty": "SBD",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(service, "resolve_drug_name", fake_resolve_drug_name)
+    monkeypatch.setattr(service, "get_spl_by_rxcui", fake_get_spl_by_rxcui)
+    monkeypatch.setattr(
+        service,
+        "get_label_by_generic_or_brand_name",
+        fake_get_label_by_generic_or_brand_name,
+    )
+    monkeypatch.setattr(
+        service,
+        "get_related_concepts_by_type",
+        fake_get_related_concepts_by_type,
+    )
+
+    result = asyncio.run(service.lookup_medicine_information(query="warfarin"))
+
+    assert [alternative.name for alternative in result.alternatives] == [
+        "Coumadin 5 MG Oral Tablet",
+        "Jantoven 5 MG Oral Tablet",
+    ]

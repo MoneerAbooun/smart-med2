@@ -12,6 +12,7 @@ import 'package:smart_med/features/interactions/data/interaction_history_reposit
 import 'package:smart_med/features/interactions/data/models/drug_interaction_record.dart';
 import 'package:smart_med/features/interactions/data/models/interaction_history_record.dart';
 import 'package:smart_med/features/interactions/domain/models/drug_interaction_lookup_result.dart';
+import 'package:smart_med/features/interactions/presentation/interaction_result_localization.dart';
 import 'package:smart_med/features/interactions/presentation/widgets/interaction_severity_chip.dart';
 import 'package:smart_med/features/medicine_search/data/repositories/medicine_search_history_repository.dart';
 import 'package:smart_med/features/medicine_search/presentation/widgets/medicine_name_suggestion_helpers.dart';
@@ -778,8 +779,11 @@ class _PatientMedicationInteractionPageState
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    item.errorMessage ??
-                        context.l10n.text('patientInteractions.result.error'),
+                    item.errorMessage == null
+                        ? context.l10n.text('patientInteractions.result.error')
+                        : context.l10n.interactionResultText(
+                            item.errorMessage!,
+                          ),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -832,7 +836,10 @@ class _PatientMedicationInteractionPageState
             ],
           ),
           const SizedBox(height: 14),
-          Text(result.summary, style: Theme.of(context).textTheme.bodyMedium),
+          Text(
+            context.l10n.interactionResultText(result.summary),
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
           if (result.warnings.isNotEmpty) ...[
             const SizedBox(height: 14),
             Text(
@@ -842,23 +849,25 @@ class _PatientMedicationInteractionPageState
               ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            ...result.warnings.map(
-              (warning) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.warning_amber_outlined,
-                      size: 18,
-                      color: colorScheme.error,
+            ...context.l10n
+                .interactionResultTexts(result.warnings)
+                .map(
+                  (warning) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_outlined,
+                          size: 18,
+                          color: colorScheme.error,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(warning)),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(warning)),
-                  ],
+                  ),
                 ),
-              ),
-            ),
           ],
           if (result.recommendations.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -869,23 +878,25 @@ class _PatientMedicationInteractionPageState
               ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
-            ...result.recommendations.map(
-              (recommendation) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline,
-                      size: 18,
-                      color: colorScheme.primary,
+            ...context.l10n
+                .interactionResultTexts(result.recommendations)
+                .map(
+                  (recommendation) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 18,
+                          color: colorScheme.primary,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(recommendation)),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(recommendation)),
-                  ],
+                  ),
                 ),
-              ),
-            ),
           ],
           const SizedBox(height: 10),
           Text(
