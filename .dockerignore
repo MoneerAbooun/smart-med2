@@ -1,0 +1,17 @@
+**
+
+!Dockerfile
+!smart_med_api/
+!smart_med_api/requirements.txt
+!smart_med_api/app/
+!smart_med_api/app/**
+!smart_med_api/models/
+!smart_med_api/models/**
+
+smart_med_api/**/__pycache__/
+smart_med_api/**/*.py[cod]
+smart_med_api/.env
+smart_med_api/env
+smart_med_api/uploads/
+smart_med_api/logs/
+smart_med_api/tests/

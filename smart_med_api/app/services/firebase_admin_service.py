@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import os
 import threading
 from dataclasses import dataclass
+from typing import Any
 
 import firebase_admin
 from fastapi import Header, HTTPException, status
@@ -16,6 +18,26 @@ class VerifiedFirebaseUser:
 
 
 _initialize_lock = threading.Lock()
+
+
+def _service_account_info_from_env() -> dict[str, Any] | None:
+    raw_value = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+    if not raw_value:
+        return None
+
+    try:
+        parsed_value = json.loads(raw_value)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "FIREBASE_SERVICE_ACCOUNT_JSON must contain valid JSON."
+        ) from exc
+
+    if not isinstance(parsed_value, dict):
+        raise RuntimeError(
+            "FIREBASE_SERVICE_ACCOUNT_JSON must contain a JSON object."
+        )
+
+    return parsed_value
 
 
 def _ensure_initialized() -> None:
@@ -32,10 +54,14 @@ def _ensure_initialized() -> None:
         except ValueError:
             pass
 
+        service_account_info = _service_account_info_from_env()
         service_account_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
         try:
-            if service_account_path:
+            if service_account_info is not None:
+                cred = credentials.Certificate(service_account_info)
+                firebase_admin.initialize_app(cred)
+            elif service_account_path:
                 cred = credentials.Certificate(service_account_path)
                 firebase_admin.initialize_app(cred)
             else:
@@ -45,12 +71,14 @@ def _ensure_initialized() -> None:
                 return
             raise RuntimeError(
                 "Firebase Admin initialization failed. "
-                "Check GOOGLE_APPLICATION_CREDENTIALS path."
+                "Check FIREBASE_SERVICE_ACCOUNT_JSON or "
+                "GOOGLE_APPLICATION_CREDENTIALS."
             ) from exc
         except Exception as exc:
             raise RuntimeError(
                 "Firebase Admin initialization failed. "
-                "Check GOOGLE_APPLICATION_CREDENTIALS path."
+                "Check FIREBASE_SERVICE_ACCOUNT_JSON or "
+                "GOOGLE_APPLICATION_CREDENTIALS."
             ) from exc
 
 
