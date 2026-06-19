@@ -64,7 +64,7 @@ class ReminderRecord {
   }
 
   Map<String, dynamic> toMap() {
-    return FirestoreValueParser.withoutNulls({
+    return {
       'userId': userId,
       'medicationId': medicationId,
       'medicationName': medicationName,
@@ -80,6 +80,6 @@ class ReminderRecord {
       'isEnabled': isEnabled,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
-    });
+    };
   }
 }

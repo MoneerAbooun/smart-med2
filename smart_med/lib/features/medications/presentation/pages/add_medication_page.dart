@@ -15,6 +15,7 @@ import 'package:smart_med/features/medications/domain/models/medication_record.d
 import 'package:smart_med/features/medications/domain/models/medication_schedule_time.dart';
 import 'package:smart_med/features/medications/domain/models/medication_safety_assessment.dart';
 import 'package:smart_med/features/medicine_search/presentation/medicine_result_localization.dart';
+import 'package:smart_med/features/reminders/data/reminder_sync_service.dart';
 import 'package:smart_med/models/local_medicine.dart';
 import 'package:smart_med/services/local_medicine_service.dart';
 import 'package:smart_med/core/widgets/app_snack_bar.dart';
@@ -41,6 +42,8 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
   final ImageStorageRepository _imageStorageRepository = imageStorageRepository;
   final MedicationImageAutofillService _medicationImageAutofillService =
       medicationImageAutofillService;
+  final MedicationReminderSyncService _reminderSyncService =
+      medicationReminderSyncService;
   final MedicationSafetyAssessmentService _safetyAssessmentService =
       medicationSafetyAssessmentService;
 
@@ -1454,14 +1457,22 @@ class _AddMedicationPageState extends State<AddMedicationPage> {
         endDate: medication.endDate,
       );
 
+      final savedMedication = medication.copyWith(
+        id: medicationId,
+        imageUrl: imageUrl,
+        notificationIds: notificationIds,
+      );
+
       await _medicationRepository.updateMedicationRecord(
         uid: user.uid,
         medicationId: medicationId,
-        medication: medication.copyWith(
-          id: medicationId,
-          imageUrl: imageUrl,
-          notificationIds: notificationIds,
-        ),
+        medication: savedMedication,
+      );
+
+      await _reminderSyncService.replaceMedicationReminders(
+        uid: user.uid,
+        medicationId: medicationId,
+        medication: savedMedication,
       );
 
       if (!mounted) return;

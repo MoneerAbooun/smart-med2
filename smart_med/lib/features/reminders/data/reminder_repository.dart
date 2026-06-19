@@ -74,14 +74,22 @@ class ReminderRepository {
       uid,
     ).where('medicationId', isEqualTo: medicationId).get();
     final batch = _firestore.batch();
+    final replacementIds = reminders
+        .map((reminder) => reminder.id)
+        .whereType<String>()
+        .toSet();
 
     for (final doc in query.docs) {
-      batch.delete(doc.reference);
+      if (!replacementIds.contains(doc.id)) {
+        batch.delete(doc.reference);
+      }
     }
 
     final collection = _collection(uid);
     for (final reminder in reminders) {
-      final docRef = reminder.id == null ? collection.doc() : collection.doc(reminder.id);
+      final docRef = reminder.id == null
+          ? collection.doc()
+          : collection.doc(reminder.id);
       final payload = reminder.toMap();
       payload['userId'] = uid;
       payload['medicationId'] = medicationId;

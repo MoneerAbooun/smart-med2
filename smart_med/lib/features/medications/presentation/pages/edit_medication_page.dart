@@ -10,6 +10,7 @@ import 'package:smart_med/core/services/notification_service.dart';
 import 'package:smart_med/features/medications/data/repositories/medication_repository.dart';
 import 'package:smart_med/features/medications/domain/models/medication_record.dart';
 import 'package:smart_med/features/medications/domain/models/medication_schedule_time.dart';
+import 'package:smart_med/features/reminders/data/reminder_sync_service.dart';
 import 'package:smart_med/models/local_medicine.dart';
 import 'package:smart_med/services/local_medicine_service.dart';
 import 'package:smart_med/core/widgets/app_snack_bar.dart';
@@ -29,6 +30,8 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
   final LocalMedicineService _localMedicineService = localMedicineService;
   final ImagePicker _imagePicker = ImagePicker();
   final ImageStorageRepository _imageStorageRepository = imageStorageRepository;
+  final MedicationReminderSyncService _reminderSyncService =
+      medicationReminderSyncService;
 
   late TextEditingController nameController;
   late TextEditingController doseController;
@@ -956,12 +959,20 @@ class _EditMedicationPageState extends State<EditMedicationPage> {
             endDate: updatedMedication.endDate,
           );
 
+      final savedMedication = updatedMedication.copyWith(
+        notificationIds: newNotificationIds,
+      );
+
       await _medicationRepository.updateMedicationRecord(
         uid: user.uid,
         medicationId: medicationId,
-        medication: updatedMedication.copyWith(
-          notificationIds: newNotificationIds,
-        ),
+        medication: savedMedication,
+      );
+
+      await _reminderSyncService.replaceMedicationReminders(
+        uid: user.uid,
+        medicationId: medicationId,
+        medication: savedMedication,
       );
 
       if (!mounted) return;

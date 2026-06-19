@@ -9,6 +9,7 @@ import 'package:smart_med/features/medications/data/repositories/medication_repo
 import 'package:smart_med/features/medications/domain/models/medication_record.dart';
 import 'package:smart_med/features/medications/presentation/pages/add_medication_page.dart';
 import 'package:smart_med/features/medications/presentation/pages/edit_medication_page.dart';
+import 'package:smart_med/features/reminders/data/reminder_sync_service.dart';
 import 'package:smart_med/core/widgets/app_snack_bar.dart';
 
 class MedicationListPage extends StatefulWidget {
@@ -20,6 +21,8 @@ class MedicationListPage extends StatefulWidget {
 
 class _MedicationListPageState extends State<MedicationListPage> {
   MedicationRepository get _medicationRepository => medicationRepository;
+  MedicationReminderSyncService get _reminderSyncService =>
+      medicationReminderSyncService;
 
   Future<void> deleteMedication(
     BuildContext context,
@@ -39,6 +42,10 @@ class _MedicationListPageState extends State<MedicationListPage> {
 
     try {
       await NotificationService.cancelNotifications(medication.notificationIds);
+      await _reminderSyncService.deleteMedicationReminders(
+        uid: user.uid,
+        medicationId: medicationId,
+      );
       await _medicationRepository.deleteMedication(
         uid: user.uid,
         medicationId: medicationId,

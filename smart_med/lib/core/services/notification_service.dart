@@ -8,6 +8,8 @@ import 'package:smart_med/core/firebase/firestore_paths.dart';
 import 'package:smart_med/core/services/notification_preferences_repository.dart';
 import 'package:smart_med/core/services/timezone_service.dart';
 import 'package:smart_med/core/utils/localized_time_parser.dart';
+import 'package:smart_med/features/medications/domain/models/medication_record.dart';
+import 'package:smart_med/features/reminders/data/reminder_sync_service.dart';
 import 'package:timezone/timezone.dart' as tz;
 
 class NotificationService {
@@ -280,6 +282,22 @@ class NotificationService {
         await doc.reference.update({'notificationIds': notificationIds});
       } catch (e) {
         debugPrint('Failed to update notificationIds for ${doc.id}: $e');
+      }
+
+      try {
+        final medication = MedicationRecord.fromMap(doc.id, {
+          ...data,
+          'userId': uid,
+          'notificationIds': notificationIds,
+        });
+
+        await medicationReminderSyncService.replaceMedicationReminders(
+          uid: uid,
+          medicationId: doc.id,
+          medication: medication,
+        );
+      } catch (e) {
+        debugPrint('Failed to sync reminder docs for ${doc.id}: $e');
       }
     }
   }
