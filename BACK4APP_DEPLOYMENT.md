@@ -35,7 +35,7 @@ Back4App supplies it and otherwise uses port `8080`.
 Choose **Deploy latest commit**. After the deployment succeeds, open:
 
 ```text
-https://YOUR-BACK4APP-URL/health
+https://smartmed-km6mdeft.b4a.run/health
 ```
 
 The expected response is:
@@ -47,7 +47,7 @@ The expected response is:
 Interactive API documentation is available at:
 
 ```text
-https://YOUR-BACK4APP-URL/docs
+https://smartmed-km6mdeft.b4a.run/docs
 ```
 
 ## 4. Connect the Flutter app
@@ -56,17 +56,20 @@ Use the exact HTTPS URL shown by Back4App, without a trailing slash:
 
 ```powershell
 cd smart_med
-flutter run --dart-define=SMART_MED_API_BASE_URL=https://YOUR-BACK4APP-URL
+flutter run
 ```
 
 For a release APK:
 
 ```powershell
-flutter build apk --release --dart-define=SMART_MED_API_BASE_URL=https://YOUR-BACK4APP-URL
+flutter build apk --release
 ```
 
-The API URL is compiled into the Flutter build, so rebuild the app after
-changing it.
+The deployed API URL is the app's default. To use a local API temporarily:
+
+```powershell
+flutter run --dart-define=SMART_MED_API_BASE_URL=http://192.168.1.50:8000
+```
 
 ## Image-storage limitation
 

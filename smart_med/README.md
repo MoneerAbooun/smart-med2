@@ -5,15 +5,16 @@ small FastAPI service for medicine lookup, drug details, and interaction data.
 
 ## Backend URL
 
-By default the Flutter app uses:
+By default the Flutter app uses the deployed Back4App API:
 
-- Android emulator: `http://10.0.2.2:8000`
-- Other platforms: `http://127.0.0.1:8000`
+```text
+https://smartmed-km6mdeft.b4a.run
+```
 
-Override it when needed:
+Override it when using a local backend:
 
 ```bash
 flutter run --dart-define=SMART_MED_API_BASE_URL=http://192.168.1.50:8000
 ```
 
-Use your machine's LAN IP when running the app on a physical phone.
+Use your machine's LAN IP when running a local backend on a physical phone.
